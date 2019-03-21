@@ -95,25 +95,36 @@
 
 (defn poll-loop
   "
+Start a consumer loop, calling a callback for each record, and returning a funcion
+to stop the loop.
+
 ### Parameters
 
          `consumer`: consumer context
-     `poll-timeout`: ms between two events poll
 `process-record-fn`: function to call with each record polled
-      `auto-close?`: close the consumer on exit
+          `options`: {:poll-timeout 2000 ; duration of a polling without events (ms)
+                      :auto-close?  false; close the consumer on exit
+                      :on-error-fn  (fn [ex] ...); called on exception
 
 ### Returns
 
 `stop-fn`: callback function to stop the loop
 "
-  [consumer poll-timeout process-record-fn auto-close?]
+  [consumer
+   process-record-fn
+   & [{:keys [poll-timeout auto-close? on-error-fn]
+       :or {poll-timeout 2000
+            auto-close? false}}]]
   (let [continue?  (atom true)
         completion (future
                      (try
                        (while @continue?
                          (try
                            (poll-and-process consumer poll-timeout process-record-fn)
-                           (catch WakeupException _)))
+                           (catch WakeupException _)
+                           (catch Throwable t
+                             (if on-error-fn (on-error-fn t))
+                                             (throw t))))
                        :ok
                        (catch Throwable t t)
                        (finally

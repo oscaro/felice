@@ -117,7 +117,7 @@
       (create-topic topic)
       (consumer/subscribe consumer topic)
       (let [counter (atom 0)
-            stop-fn (consumer/poll-loop consumer 2000 (fn [record] (swap! counter inc)) true)]
+            stop-fn (consumer/poll-loop consumer (fn [_] (swap! counter inc)) {:auto-close? true})]
         (producer/send! producer topic "first")
         (Thread/sleep 1000)
         (is (= 1 @counter))
