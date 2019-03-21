@@ -31,11 +31,13 @@
 (defn subscription [^KafkaConsumer consumer] (.subscription consumer))
 
 (defn subscribe [^KafkaConsumer consumer & topics]
-  (.subscribe consumer (concat (subscription consumer) topics)))
+  (.subscribe consumer (concat (subscription consumer) topics))
+  consumer)
 
 (defn unsubscribe [^KafkaConsumer consumer]
   "Unsubscribe from topics currently subscribed"
-  (.unsubscribe consumer))
+  (.unsubscribe consumer)
+  consumer)
 
 (defn position [^KafkaConsumer consumer topic partition])
 
@@ -124,10 +126,16 @@
 
 (defn consumer
   "create a consumer"
-  ([conf]                                     (KafkaConsumer. (walk/stringify-keys conf)))
-  ([conf key-deserializer value-deserializer] (KafkaConsumer. (walk/stringify-keys conf)
-                                                              (deserializer key-deserializer)
-                                                              (deserializer value-deserializer))))
+  ([conf]
+    (KafkaConsumer. (walk/stringify-keys conf)))
+  ([conf key-deserializer value-deserializer]
+    (KafkaConsumer. (walk/stringify-keys conf)
+                    (deserializer key-deserializer)
+                    (deserializer value-deserializer)))
+  ([conf key-deserializer value-deserializer topics]
+    (apply subscribe (consumer conf key-deserializer value-deserializer) topics)))
+
+
 (defn close!
   ([^KafkaConsumer consumer])
   ([^KafkaConsumer consumer timeout]))
