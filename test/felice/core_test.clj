@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.java.shell :refer [sh]]
             [clojure.string :refer [trim-newline split]]
-            
+
             [felice.consumer :as consumer]
             [felice.producer :as producer]))
 
@@ -45,7 +45,7 @@
           topic "topic"]
       (create-topic topic)
       (consumer/subscribe consumer topic)
-      
+
       (producer/send! producer topic "value")
       (producer/send! producer topic "key" "value")
       (producer/send! producer {:topic topic :key "key" :value "value"})
@@ -71,7 +71,7 @@
 
       (create-topic topic)
       (consumer/subscribe consumer topic)
-      
+
       (producer/send! producer topic message)
       (producer/flush! producer)
       (let [consumer-records (consumer/poll consumer 60000)
@@ -95,7 +95,7 @@
 
       (create-topic topic)
       (consumer/subscribe consumer topic)
-      
+
       (producer/send! producer topic message)
       (producer/flush! producer)
       (let [consumer-records (consumer/poll consumer 60000)
@@ -117,15 +117,14 @@
       (create-topic topic)
       (consumer/subscribe consumer topic)
       (let [counter (atom 0)
-            loop (consumer/poll-loop consumer 2000 (fn [record] (swap! counter inc)) true)]
+            stop-fn (consumer/poll-loop consumer 2000 (fn [record] (swap! counter inc)) true)]
         (producer/send! producer topic "first")
         (Thread/sleep 1000)
         (is (= 1 @counter))
         (producer/send! producer topic "second")
         (Thread/sleep 1000)
         (is (= 2 @counter))
-        (reset! (:continue? loop) false)
-        (deref (:completion loop)))
+        (stop-fn))
       (producer/close! producer)))
   )
 

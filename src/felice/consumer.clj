@@ -25,11 +25,14 @@
 
 (defn metrics [^KafkaConsumer consumer]
   (map (fn [m] (metric->map (.getValue m))) (.metrics consumer)))
+
 (defn partitions-for [^KafkaConsumer consumer])
 
 (defn subscription [^KafkaConsumer consumer] (.subscription consumer))
+
 (defn subscribe [^KafkaConsumer consumer & topics]
   (.subscribe consumer (concat (subscription consumer) topics)))
+
 (defn unsubscribe [^KafkaConsumer consumer]
   "Unsubscribe from topics currently subscribed"
   (.unsubscribe consumer))
@@ -79,7 +82,7 @@
          (map (fn[topic] [topic (map consumer-record->map (.records records topic))]))
          (into {}))))
 
-(defn consumer-records->records-by-partition 
+(defn consumer-records->records-by-partition
   [^ConsumerRecords records])
 
 (defn poll-and-process [^KafkaConsumer consumer timeout process]
@@ -89,21 +92,35 @@
       (process record))))
 
 (defn poll-loop
-  [consumer poll-timeout process-record auto-close?]
+  "
+### Parameters
+
+         `consumer`: consumer context
+     `poll-timeout`: ms between two events poll
+`process-record-fn`: function to call with each record polled
+      `auto-close?`: close the consumer on exit
+
+### Returns
+
+`stop-fn`: callback function to stop the loop
+"
+  [consumer poll-timeout process-record-fn auto-close?]
   (let [continue?  (atom true)
         completion (future
                      (try
                        (while @continue?
                          (try
-                           (poll-and-process consumer poll-timeout process-record)
+                           (poll-and-process consumer poll-timeout process-record-fn)
                            (catch WakeupException _)))
                        :ok
                        (catch Throwable t t)
                        (finally
                          (when auto-close?
                            (.close consumer)))))]
-    {:continue?  continue?
-     :completion completion}))
+    (fn []
+      (reset! continue? false)
+      (deref completion))))
+
 
 (defn consumer
   "create a consumer"
@@ -113,4 +130,4 @@
                                                               (deserializer value-deserializer))))
 (defn close!
   ([^KafkaConsumer consumer])
-  ([^KafkaConsumer consumer timeout])) 
+  ([^KafkaConsumer consumer timeout]))
