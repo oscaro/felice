@@ -149,5 +149,5 @@ to stop the loop.
 
 
 (defn close!
-  ([^KafkaConsumer consumer])
-  ([^KafkaConsumer consumer timeout]))
+  ([^KafkaConsumer consumer]         (.close consumer))
+  ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
