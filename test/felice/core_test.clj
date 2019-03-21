@@ -2,9 +2,11 @@
   (:require [clojure.test :refer :all]
             [clojure.java.shell :refer [sh]]
             [clojure.string :refer [trim-newline split]]
-
+            [clojure.core.async :as async]
+            
             [felice.consumer :as consumer]
-            [felice.producer :as producer]))
+            [felice.producer :as producer]
+            [felice.async    :as fa]))
 
 (defn start-docker-kafka []
   (println "starting kafka...")
@@ -125,9 +127,38 @@
         (Thread/sleep 1000)
         (is (= 2 @counter))
         (stop-fn))
-      (producer/close! producer)))
-  )
+      (producer/close! producer))))
 
-;(deftest serialization (testing "no serialization"))
+(deftest async
+  (testing "poll-chan"
+    (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :long :long)
+          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
+                                       :auto.offset.reset "earliest"
+                                       :enable.auto.commit false}
+                                      :long :long)
+          topic "topic5"]
+      (create-topic topic)
+      (consumer/subscribe consumer topic)
+      (let [records (async/chan 100)
+            consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
+                                   :auto.offset.reset "earliest"
+                                   :enable.auto.commit false}
+                                  :long :long
+                                  records topic)]
+        (doseq [i (range 10)]
+          (producer/send! producer topic i i))
+        (is (= 0 (:key (async/<!! records))))
+        (fa/commit-message-offset consumer (async/<!! records))
+        (fa/close! consumer))
 
+      (let [records (async/chan 100)
+            consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
+                                   :auto.offset.reset "earliest"
+                                   :enable.auto.commit false}
+                                  :long :long
+                                  records topic)]
+        (is (= 2 (:key (async/<!! records))))
+
+        (fa/close! consumer))
+      (producer/close! producer))))
 
