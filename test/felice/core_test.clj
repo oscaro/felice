@@ -132,13 +132,8 @@
 (deftest async
   (testing "poll-chan"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :long :long)
-          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
-                                       :auto.offset.reset "earliest"
-                                       :enable.auto.commit false}
-                                      :long :long)
           topic "topic5"]
       (create-topic topic)
-      (consumer/subscribe consumer topic)
       (let [records (async/chan 100)
             consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
                                    :auto.offset.reset "earliest"
@@ -153,12 +148,40 @@
 
       (let [records (async/chan 100)
             consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
-                                   :auto.offset.reset "earliest"
-                                   :enable.auto.commit false}
-                                  :long :long
-                                  records topic)]
+                                         :auto.offset.reset "earliest"
+                                         :enable.auto.commit false}
+                                        :long :long
+                                        records topic)]
         (is (= 2 (:key (async/<!! records))))
 
         (fa/close! consumer))
+      (producer/close! producer)))
+
+
+  (testing "poll-chans"
+    (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :long :long)
+          topics (map #(str "pc-" %) (range 5))]
+      (doseq [topic topics] (create-topic topic))
+      (let [chans (into {} (map (fn [topic] [topic (async/chan 100)]) topics))
+            consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
+                                   :auto.offset.reset "earliest"
+                                   :enable.auto.commit false}
+                                  :long :long
+                                  chans)
+            stats (atom {})]
+        (dotimes [i 5] (producer/send! producer "pc-0" 0 0))
+        (dotimes [i 4] (producer/send! producer "pc-1" 1 1))
+        (dotimes [i 3] (producer/send! producer "pc-2" 2 2))
+        (dotimes [i 2] (producer/send! producer "pc-3" 3 3))
+        (producer/send! producer "pc-4" 4 4)
+
+        (doseq [[topic chan] chans]
+          (async/go-loop [item (async/<! chan)]
+            (when item
+              (swap! stats update topic (fnil inc 0))
+              (recur (async/<! chan)))))
+        (fa/close! consumer)
+        (is (= {"pc-0" 5 "pc-1" 4 "pc-2" 3 "pc-3" 2 "pc-4" 1}
+               @stats)))
       (producer/close! producer))))
 
