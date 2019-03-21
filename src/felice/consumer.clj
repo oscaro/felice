@@ -12,8 +12,8 @@
 
 (defn commit-message-offset [^KafkaConsumer consumer {:keys [partition topic offset]}]
   (let [commit-point (long (inc offset))]
-    (.commit consumer {(TopicPartition. topic partition)
-                       (OffsetAndMetadata. commit-point)})))
+    (.commitSync consumer {(TopicPartition. topic partition)
+                           (OffsetAndMetadata. commit-point)})))
 
 (defn metric->map [^Metric metric]
   (let [metric-name (.metricName metric)]
@@ -122,6 +122,7 @@
     (fn []
       (reset! continue? false)
       (deref completion))))
+
 
 
 (defn consumer
