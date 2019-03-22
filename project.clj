@@ -7,7 +7,8 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :plugins [[lein-codox "0.10.6"]]
-  :codox {:source-uri "https://gitlab.oscaroad.com/it-dev/felice/blob/{git-commit}/{filepath}#L{line}"}
+  :codox {:output-path "public"
+          :source-uri "https://gitlab.oscaroad.com/it-dev/felice/blob/{git-commit}/{filepath}#L{line}"}
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.apache.kafka/kafka-clients "2.1.0"]
                  [com.cognitect/transit-clj "0.8.313"]]
