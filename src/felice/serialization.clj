@@ -1,4 +1,4 @@
-(ns felice.serialization
+(ns ^:no-doc felice.serialization
   (:require [cognitect.transit :as transit])
   (:import [org.apache.kafka.common.serialization Serializer       Deserializer
                                                   LongSerializer   LongDeserializer
