@@ -54,7 +54,7 @@
       (producer/flush! producer)
       (println (consumer/subscription consumer))
       (let [consumer-records (consumer/poll consumer 100000)
-            records (consumer/consumer-records->all-records consumer-records)]
+            records (consumer/poll->all-records consumer-records)]
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 3 (count records)))
         (is (= "value" (:value (first records))))
@@ -77,7 +77,7 @@
       (producer/send! producer topic message)
       (producer/flush! producer)
       (let [consumer-records (consumer/poll consumer 60000)
-            records (consumer/consumer-records->all-records consumer-records)
+            records (consumer/poll->all-records consumer-records)
             record (first records)]
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 1 (count records)))
@@ -101,7 +101,7 @@
       (producer/send! producer topic message)
       (producer/flush! producer)
       (let [consumer-records (consumer/poll consumer 60000)
-            records (consumer/consumer-records->all-records consumer-records)
+            records (consumer/poll->all-records consumer-records)
             record (first records)]
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 1 (count records)))

@@ -27,7 +27,7 @@
     (try
       (while (not (clojure.core.async.impl.protocols/closed? records-chan))
         (async/onto-chan records-chan
-                         (consumer/consumer-records->all-records
+                         (consumer/poll->all-records
                           (try (consumer/poll consumer poll-timeout)
                                (catch WakeupException _)))
                          false)
@@ -55,7 +55,7 @@
             (while @continue?
               (let [poll (try (consumer/poll consumer poll-timeout)
                               (catch WakeupException _))
-                    records-by-topic (consumer/consumer-records->records-by-topic poll)]
+                    records-by-topic (consumer/poll->records-by-topic poll)]
                 (doseq [[topic records] records-by-topic]
                   (async/onto-chan (topic->chan topic) records false)))
               ;; process consumer controls
