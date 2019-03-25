@@ -47,11 +47,14 @@
   conf is a map {:keyword value} (for all  possibilities see https://kafka.apache.org/documentation/#producerconfigs)
 
 key and value serializer can be one of :long :string :t+json :t+mpack
-with the 1 argument arity, :key.deserializer and :value.deserializer must be provided in conf"
-  ([conf]                                 (KafkaProducer. (walk/stringify-keys conf)))
-  ([conf key-serializer value-serializer] (KafkaProducer. (walk/stringify-keys conf)
-                                                          (serializer key-serializer)
-                                                          (serializer value-serializer))))
+with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf"
+  ([conf]
+    (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
+                    (serializer (:key.serializer conf))
+                    (serializer (:value.serializer conf))))
+  ([conf key-serializer value-serializer]
+    (producer (assoc conf :key.serializer key-serializer
+                          :value.serializer value-serializer))))
 
 (defn close!
   "This method waits up to timeout ms for the producer to complete the sending of all incomplete requests.

@@ -166,19 +166,25 @@ to stop the loop.
   "create a consumer
 
   conf is a map {:keyword value} (for all  possibilities see https://kafka.apache.org/documentation/#consumerconfigs)
-  
+
   key and value deserializer can be one of :long :string :t+json :t+mpack
   with the 1 argument arity, :key.deserializer and :value.deserializer must be provided in conf
 
   you can optionaly provide a list of topics to subscribe to"
   ([conf]
-    (KafkaConsumer. (walk/stringify-keys conf)))
+    (let [kd (deserializer (:key.deserializer conf))
+          vd (deserializer (:value.deserializer conf))
+          kc (KafkaConsumer. (walk/stringify-keys (dissoc conf :key.deserializer :value.deserializer))
+                             kd vd)]
+      (when-let [topics (:topics conf)]
+        (apply subscribe kc topics))
+      kc))
   ([conf key-deserializer value-deserializer]
-    (KafkaConsumer. (walk/stringify-keys conf)
-                    (deserializer key-deserializer)
-                    (deserializer value-deserializer)))
+    (consumer (assoc conf :key.deserializer key-deserializer
+                          :value.deserializer value-deserializer)))
   ([conf key-deserializer value-deserializer topics]
-    (apply subscribe (consumer conf key-deserializer value-deserializer) topics)))
+    (consumer (assoc conf :topics topics) key-deserializer value-deserializer)))
+
 
 
 (defn close!
