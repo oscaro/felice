@@ -11,6 +11,7 @@
           :source-uri "https://gitlab.oscaroad.com/it-dev/felice/blob/{git-commit}/{filepath}#L{line}"}
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.apache.kafka/kafka-clients "2.1.0"]
-                 [com.cognitect/transit-clj "0.8.313"]]
+                 [com.cognitect/transit-clj "0.8.313"]
+                 [metosin/jsonista "0.2.2"]]
   :profiles {:dev {:dependencies [[org.slf4j/slf4j-jdk14 "1.7.25"]
                                   [org.clojure/core.async "0.4.490"]]}})

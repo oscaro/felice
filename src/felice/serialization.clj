@@ -1,5 +1,6 @@
 (ns ^:no-doc felice.serialization
-  (:require [cognitect.transit :as transit])
+  (:require [cognitect.transit :as transit]
+            [jsonista.core :as json])
   (:import [org.apache.kafka.common.serialization Serializer       Deserializer
                                                   LongSerializer   LongDeserializer
                                                   StringSerializer StringDeserializer]
@@ -17,22 +18,45 @@
         (.toByteArray out)))))
 
 (defn transit-deserializer [type]
-    (reify
-      Deserializer
-      (close [this])
-      (configure [this config is-key?])
-      (deserialize [this topic payload]
-        (let [in (ByteArrayInputStream. payload)
-              reader (transit/reader in type)]
-          (transit/read reader)))))
+  (reify
+    Deserializer
+    (close [this])
+    (configure [this config is-key?])
+    (deserialize [this topic payload]
+      (let [in (ByteArrayInputStream. payload)
+            reader (transit/reader in type)]
+        (transit/read reader)))))
 
-(def serializers {:long   (fn [] (LongSerializer.))
-                  :string (fn [] (StringSerializer.))
+(def json-mapper
+  (json/object-mapper {:encode-key-fn name
+                       :decode-key-fn keyword}))
+
+(defn json-serializer []
+  (reify
+    Serializer
+    (close [this])
+    (configure [this config is-key?])
+    (serialize [this topic payload]
+      (.getBytes (json/write-value-as-string payload json-mapper)))))
+
+(defn json-deserializer []
+  (reify
+    Deserializer
+    (close [this])
+    (configure [this config is-key?])
+    (deserialize [this topic payload]
+      (json/read-value (String. payload) json-mapper))))
+
+
+(def serializers {:long     (fn [] (LongSerializer.))
+                  :string   (fn [] (StringSerializer.))
+                  :json     json-serializer
                   :t+json   (partial transit-serializer :json)
                   :t+mpack  (partial transit-serializer :msgpack)})
 
 (def deserializers {:long    (fn [] (LongDeserializer.))
                     :string  (fn [] (StringDeserializer.))
+                    :json    json-deserializer
                     :t+json  (partial transit-deserializer :json)
                     :t+mpack (partial transit-deserializer :msgpack)})
 

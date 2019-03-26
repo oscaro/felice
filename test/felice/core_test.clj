@@ -114,7 +114,7 @@
   (testing "poll-loop"
     (let [topic "topic4"
           key-fmt :string
-          val-fmt :string
+          val-fmt :json
           producer (producer/producer {:bootstrap.servers "localhost:9092"} key-fmt val-fmt)
           consumer-cfg {:bootstrap.servers "localhost:9092"
                         :group.id "test-4"
@@ -124,13 +124,15 @@
                         :topics #{topic}}]
       (create-topic topic)
       (let [counter (atom 0)
-            stop-fn (consumer/poll-loop consumer-cfg (fn [_] (swap! counter inc)) {})]
-        (producer/send! producer topic "first")
+            process-fn (fn [{:keys [topic partition offset timestamp key value]}]
+                          (swap! counter + (:zob value)))
+            stop-fn (consumer/poll-loop consumer-cfg process-fn {})]
+        (producer/send! producer topic {:zob 42})
         (Thread/sleep 1000)
-        (is (= 1 @counter))
-        (producer/send! producer topic "second")
+        (is (= 42 @counter))
+        (producer/send! producer topic {:zob 66})
         (Thread/sleep 1000)
-        (is (= 2 @counter))
+        (is (= (+ 42 66) @counter))
         (stop-fn))
       (producer/close! producer))))
 
