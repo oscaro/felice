@@ -1,7 +1,7 @@
 pages:
   stage: deploy
   script:
-  - echo 'Nothing to do...'
+  - lein codox
   artifacts:
     paths:
     - public
