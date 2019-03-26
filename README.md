@@ -2,6 +2,8 @@
 
 Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 
+[API docs](https://it-dev.pages.oscaroad.com/felice/)
+
 ## De/Serializers
 
 | TYPE                | KEYWORD    |
