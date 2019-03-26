@@ -3,7 +3,7 @@
             [clojure.java.shell :refer [sh]]
             [clojure.string :refer [trim-newline split]]
             [clojure.core.async :as async]
-            
+
             [felice.consumer :as consumer]
             [felice.producer :as producer]
             [felice.async    :as fa]))
@@ -112,14 +112,19 @@
       (consumer/close! consumer)))
 
   (testing "poll-loop"
-    (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
-          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" :group.id "test-4"
-                                       :auto.offset.reset "earliest"} :string :string)
-          topic "topic4"]
+    (let [topic "topic4"
+          key-fmt :string
+          val-fmt :string
+          producer (producer/producer {:bootstrap.servers "localhost:9092"} key-fmt val-fmt)
+          consumer-cfg {:bootstrap.servers "localhost:9092"
+                        :group.id "test-4"
+                        :auto.offset.reset "earliest"
+                        :key.deserializer key-fmt
+                        :value.deserializer val-fmt
+                        :topics #{topic}}]
       (create-topic topic)
-      (consumer/subscribe consumer topic)
       (let [counter (atom 0)
-            stop-fn (consumer/poll-loop consumer (fn [_] (swap! counter inc)) {:auto-close? true})]
+            stop-fn (consumer/poll-loop consumer-cfg (fn [_] (swap! counter inc)) {})]
         (producer/send! producer topic "first")
         (Thread/sleep 1000)
         (is (= 1 @counter))

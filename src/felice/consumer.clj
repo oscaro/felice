@@ -123,44 +123,6 @@
     (doseq [record records]
       (process-fn record))))
 
-(defn poll-loop
-  "Start a consumer loop, calling a callback for each record, and returning a funcion
-to stop the loop.
-
-### Parameters
-             consumer: consumer context
-    process-record-fn: function to call with each record polled
-              options: {:poll-timeout 2000 ; duration of a polling without events (ms)
-                        :auto-close?  false; close the consumer on exit
-                        :on-error-fn  (fn [ex] ...); called on exception
-
-### Returns
-              stop-fn: callback function to stop the loop"
-  [consumer
-   process-record-fn
-   & [{:keys [poll-timeout auto-close? on-error-fn]
-       :or {poll-timeout 2000
-            auto-close? false}}]]
-  (let [continue?  (atom true)
-        completion (future
-                     (try
-                       (while @continue?
-                         (try
-                           (poll-and-process consumer poll-timeout process-record-fn)
-                           (catch WakeupException _)
-                           (catch Throwable t
-                             (if on-error-fn (on-error-fn t))
-                                             (throw t))))
-                       :ok
-                       (catch Throwable t t)
-                       (finally
-                         (when auto-close?
-                           (.close consumer)))))]
-    (fn []
-      (reset! continue? false)
-      (deref completion))))
-
-
 
 (defn consumer
   "create a consumer
@@ -194,3 +156,40 @@ to stop the loop.
   If the consumer is unable to complete offset commits and gracefully leave the group before the timeout expires, the consumer is force closed."
   ([^KafkaConsumer consumer]         (.close consumer))
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
+
+
+(defn poll-loop
+  "Start a consumer loop, calling a callback for each record, and returning a funcion
+to stop the loop.
+
+### Parameters
+             consumer: consumer config (see consumer)
+    process-record-fn: function to call with each record polled
+              options: {:poll-timeout 2000 ; duration of a polling without events (ms)
+                        :on-error-fn  (fn [ex] ...); called on exception
+
+### Returns
+              stop-fn: callback function to stop the loop"
+  [consumer-conf
+   process-record-fn
+   & [{:keys [poll-timeout auto-close? on-error-fn]
+       :or {poll-timeout 2000
+            auto-close? false}}]]
+  (let [consumer   (consumer consumer-conf)
+        continue?  (atom true)
+        completion (future
+                     (try
+                       (while @continue?
+                         (try
+                           (poll-and-process consumer poll-timeout process-record-fn)
+                           (catch WakeupException _)
+                           (catch Throwable t
+                             (if on-error-fn (on-error-fn t))
+                                             (throw t))))
+                       :ok
+                       (catch Throwable t t)
+                       (finally
+                           (close! consumer (:close.timeout.ms consumer-conf Long/MAX_VALUE)))))]
+    (fn []
+      (reset! continue? false)
+      (deref completion))))
