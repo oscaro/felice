@@ -4,6 +4,8 @@ Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 
 ## De/Serializers
 
+|Available key/value de/serializers|
++---------------------+------------+
 | String              | `:string`  |
 | Json                | `:json`    |
 | Transit MessagePack | `:t+mpack` |
