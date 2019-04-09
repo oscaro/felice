@@ -29,10 +29,13 @@ Deploy env is '$deployEnv'"""
                 docker
                   .image("spotify/kafka")
                   .withRun("-p $zkport:$zkport -p $port:$port --env ADVERTISED_HOST=0.0.0.0 --env ADVERTISED_PORT=$port") { ctnr ->
-                      timeout(time: 30, unit: 'SECONDS') {
-                          lein 'test'
+                      try {
+                          timeout(time: 30, unit: 'SECONDS') {
+                              lein 'test'
+                          }
+                      } finally {
+                          sh "docker logs ${ctnr.id}"
                       }
-                      sh "docker logs ${ctnr.id}"
                   }
             }
             stage('Build') { lein 'jar' }
