@@ -24,10 +24,11 @@ Deploy env is '$deployEnv'"""
 
                 stage('Test') {
                     lein 'clean'
+		    def zkport = 2181
                     def port = 9092
                     docker
                       .image("spotify/kafka")
-                      .withRun("-p 2181:2181 -p 9092:9092 --env ADVERTISED_HOST=172.17.0.1 --env ADVERTISED_PORT=9092")
+                      .withRun("-p $zkport:$zkport -p $port:$port --env ADVERTISED_HOST=0.0.0.0 --env ADVERTISED_PORT=$port")
                     { ctnr ->
                         lein 'test'
                     }
