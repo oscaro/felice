@@ -29,7 +29,7 @@ Deploy env is '$deployEnv'"""
                 docker
                   .image("spotify/kafka")
                   .withRun("-p $zkport:$zkport -p $port:$port --env ADVERTISED_HOST=0.0.0.0 --env ADVERTISED_PORT=$port") { ctnr ->
-                      sleep 5000
+                      sleep time: 5, unit: 'SECONDS'
                       try {
                           timeout(time: 30, unit: 'SECONDS') {
                               lein 'test'
