@@ -37,7 +37,7 @@
     (f)
     (close-docker-kafka container)))
 
-(use-fixtures :once docker-kafka)
+;(use-fixtures :once docker-kafka)
 
 (deftest client
   (testing "produce and consume strings"
