@@ -30,7 +30,7 @@
 
 (defn create-topic [topic]
   (sh
-   "dev-resources/kafka-topics.sh" "--create" "--zookeeper" "localhost:2181" "--replication-factor" "3" "--partitions" "3" "--topic" (str topic)))
+   "dev-resources/kafka-topics.sh" "--create" "--zookeeper" "0.0.0.0:2181" "--replication-factor" "3" "--partitions" "3" "--topic" (str topic)))
 
 (defn docker-kafka [f]
   (let [container (start-docker-kafka)]
@@ -140,15 +140,19 @@
   (testing "poll-chan"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :long :long)
           topic "topic5"]
+      (println "CREATE TOPIC...")
       (create-topic topic)
+      (println "TOPIC CREATED")
       (let [records (async/chan 100)
             consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
                                    :auto.offset.reset "earliest"
                                    :enable.auto.commit false}
                                   :long :long
                                   records topic)]
+        (println "PRODUCING...")
         (doseq [i (range 10)]
           (producer/send! producer topic i i))
+        (println "PRODUCED")
         (is (= 0 (:key (async/<!! records))))
         (fa/commit-message-offset consumer (async/<!! records))
         (fa/close! consumer))
