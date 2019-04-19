@@ -141,7 +141,7 @@
   ([conf]
     (let [kd (deserializer (:key.deserializer conf))
           vd (deserializer (:value.deserializer conf))
-          kc (KafkaConsumer. (walk/stringify-keys (dissoc conf :key.deserializer :value.deserializer))
+          kc (KafkaConsumer. (walk/stringify-keys (dissoc conf :key.deserializer :value.deserializer :topics))
                              kd vd)]
       (when-let [topics (:topics conf)]
         (apply subscribe kc topics))
@@ -183,8 +183,7 @@ to stop the loop.
   [consumer-conf
    process-record-fn
    & [{:keys [poll-timeout auto-close? on-error-fn commit-policy]
-       :or {poll-timeout 2000
-            auto-close? false}}]]
+       :or {poll-timeout 2000}}]]
   (let [consumer   (consumer consumer-conf)
         continue?  (atom true)
         completion (future
@@ -196,10 +195,13 @@ to stop the loop.
                            (catch Throwable t
                              (if on-error-fn (on-error-fn t))
                                              (throw t))))
-                       :ok
+                       :stopped
                        (catch Throwable t t)
                        (finally
                            (close! consumer (:close.timeout.ms consumer-conf Long/MAX_VALUE)))))]
-    (fn []
-      (reset! continue? false)
-      (deref completion))))
+    (fn
+      ([]
+       (reset! continue? false)
+       (deref completion))
+      ([timeout]
+       (deref completion timeout :polling)))))
