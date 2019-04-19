@@ -119,6 +119,7 @@
           consumer-cfg {:bootstrap.servers "localhost:9092"
                         :group.id "test-4"
                         :auto.offset.reset "earliest"
+                        :enable.auto.commit false
                         :key.deserializer key-fmt
                         :value.deserializer val-fmt
                         :topics #{topic}}]
@@ -126,7 +127,7 @@
       (let [counter (atom 0)
             process-fn (fn [{:keys [topic partition offset timestamp key value]}]
                           (swap! counter + (:zob value)))
-            stop-fn (consumer/poll-loop consumer-cfg process-fn {})]
+            stop-fn (consumer/poll-loop consumer-cfg process-fn {:auto-close? true})]
         (producer/send! producer topic {:zob 42})
         (Thread/sleep 1000)
         (is (= 42 @counter))
@@ -134,6 +135,23 @@
         (Thread/sleep 1000)
         (is (= (+ 42 66) @counter))
         (stop-fn))
+
+      (testing "commit by poll"
+        (let [topic "topic-41"
+              last-record (atom nil)
+              consumer-cfg (assoc consumer-cfg :topics #{topic})
+              process-fn (fn [r] (reset! last-record r))]
+          (create-topic topic)
+          (let [producing (future (dotimes [i 10] (Thread/sleep 1000) (producer/send! producer topic {:zob 0})))
+                stop-fn (consumer/poll-loop consumer-cfg process-fn {:auto-close? true :commit-policy :poll})]
+            (Thread/sleep 3000)
+            (stop-fn)
+            (deref producing)
+            (let [consumer (consumer/consumer consumer-cfg)
+                  {offset-commited :offset} @last-record
+                  {offset-read :offset} (first (consumer/poll->all-records (consumer/poll consumer 1000)))]
+              (is (= offset-commited (dec offset-read)))
+              (consumer/close! consumer)))))
       (producer/close! producer))))
 
 (deftest async

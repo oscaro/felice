@@ -64,7 +64,8 @@
   (.unsubscribe consumer)
   consumer)
 
-(defn ^:no-doc position [^KafkaConsumer consumer topic partition])
+(defn ^:no-doc position [^KafkaConsumer consumer topic partition]
+  (.position consumer (TopicPartition. topic partition)))
 
 (defn poll
   "Fetch data for the topics or partitions specified using one of the subscribe/assign APIs. This method returns immediately if there are records available. Otherwise, it will await the timeout ms. If the timeout expires, an empty record set will be returned."
@@ -117,11 +118,15 @@
 
 (defn poll-and-process
   "Poll records and run process-fn on each of them (presumably for side effects)"
-  [^KafkaConsumer consumer timeout process-fn]
+  [^KafkaConsumer consumer timeout process-fn commit-policy]
   (let [records (-> (poll consumer timeout)
                     (poll->all-records))]
     (doseq [record records]
-      (process-fn record))))
+      (process-fn record)
+      (when (= :record commit-policy)
+        (commit-message-offset consumer record)))
+    (when (= :poll commit-policy)
+      (commit-sync consumer))))
 
 
 (defn consumer
@@ -167,12 +172,17 @@ to stop the loop.
     process-record-fn: function to call with each record polled
               options: {:poll-timeout 2000 ; duration of a polling without events (ms)
                         :on-error-fn  (fn [ex] ...); called on exception
+                        :commit-policy :never ; #{:never :poll :record}}
+#### commit policy
+* :never  : does nothing (use it if you enabled client auto commit)
+* :poll   : commit last read offset after processing all the items of a poll
+* :record : commit the offset of every processed record
 
 ### Returns
               stop-fn: callback function to stop the loop"
   [consumer-conf
    process-record-fn
-   & [{:keys [poll-timeout auto-close? on-error-fn]
+   & [{:keys [poll-timeout auto-close? on-error-fn commit-policy]
        :or {poll-timeout 2000
             auto-close? false}}]]
   (let [consumer   (consumer consumer-conf)
@@ -181,7 +191,7 @@ to stop the loop.
                      (try
                        (while @continue?
                          (try
-                           (poll-and-process consumer poll-timeout process-record-fn)
+                           (poll-and-process consumer poll-timeout process-record-fn commit-policy)
                            (catch WakeupException _)
                            (catch Throwable t
                              (if on-error-fn (on-error-fn t))
