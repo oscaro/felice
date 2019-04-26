@@ -45,7 +45,25 @@
     (close [this])
     (configure [this config is-key?])
     (deserialize [this topic payload]
-      (json/read-value (String. payload) json-mapper))))
+      (let [as-string (String. payload)]
+        (try (json/read-value as-string json-mapper)
+             (catch Exception e
+               (throw (ex-info "malformed json"
+                               {:cause e
+                                :content as-string
+                                :topic topic}))))))))
+
+(defn json-safe-deserializer []
+  (reify
+    Deserializer
+    (close [this])
+    (configure [this config is-key?])
+    (deserialize [this topic payload]
+      (let [as-string (String. payload)]
+        (try (json/read-value as-string json-mapper)
+             (catch Exception e
+               {:raw-value as-string
+                ::error {:deserializing e}}))))))
 
 
 (def serializers {:long     (fn [] (LongSerializer.))
@@ -57,6 +75,7 @@
 (def deserializers {:long    (fn [] (LongDeserializer.))
                     :string  (fn [] (StringDeserializer.))
                     :json    json-deserializer
+                    :json-safe    json-safe-deserializer
                     :t+json  (partial transit-deserializer :json)
                     :t+mpack (partial transit-deserializer :msgpack)})
 
