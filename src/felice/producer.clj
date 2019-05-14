@@ -2,8 +2,7 @@
   (:require [clojure.walk :as walk]
             [felice.serialization :refer [serializer]])
   (:import java.util.concurrent.TimeUnit
-           org.apache.kafka.clients.producer.KafkaProducer
-           org.apache.kafka.clients.producer.ProducerRecord))
+           [org.apache.kafka.clients.producer KafkaProducer ProducerRecord Callback]))
 
 (defn flush!
   "Invoking this method makes all buffered records immediately available to send (even if linger.ms is greater than 0) and blocks on the completion of the requests associated with these records."
@@ -27,8 +26,14 @@
 
 (defn ^:no-doc send-record!
   "sends a ProducerRecord with an optional callback when the send has been acknowledged."
-  ([^KafkaProducer producer ^ProducerRecord record]          (.send producer (producer-record record)))
-  ([^KafkaProducer producer ^ProducerRecord record callback] (.send producer (producer-record record) callback)))
+  ([^KafkaProducer producer ^ProducerRecord record]
+   (.send producer (producer-record record)))
+  ([^KafkaProducer producer ^ProducerRecord record callback]
+   (.send producer
+          (producer-record record)
+          (reify Callback
+            (onCompletion [this metadata exception]
+              (callback (or exception metadata)))))))
 
 (defn ->record
   "creates a record map given a topic, a value and an optional key"
@@ -36,10 +41,23 @@
   ([topic key value] {:topic topic :key key :value value}))
 
 (defn send!
-  "send a record"
+  "asynchronously send a record"
   ([^KafkaProducer producer topic value]     (send-record! producer (->record topic value)))
   ([^KafkaProducer producer topic key value] (send-record! producer (->record topic key value)))
   ([^KafkaProducer producer record-map]      (send-record! producer record-map)))
+
+(defn send-with-callback!
+  "asynchronously send a record triggering the given callback when the send has been acknowledged
+  Note that callbacks will generally execute in the I/O thread of the producer and so should be reasonably fast or they will delay the sending of messages from other threads. If you want to execute blocking or computationally expensive callbacks it is recommended to use your own Executor in the callback body to parallelize processing."
+  ([^KafkaProducer producer topic value cb]     (send-record! producer (->record topic value) cb))
+  ([^KafkaProducer producer topic key value cb] (send-record! producer (->record topic key value) cb))
+  ([^KafkaProducer producer record-map cb]      (send-record! producer record-map cb)))
+
+(defn send!!
+  "synchronously send a record - wait until acknowledged"
+  ([^KafkaProducer producer topic value]     (send!! producer (->record topic value)))
+  ([^KafkaProducer producer topic key value] (send!! producer (->record topic key value)))
+  ([^KafkaProducer producer record-map] (.get (send! producer record-map))))
 
 (defn producer
   "create a producer

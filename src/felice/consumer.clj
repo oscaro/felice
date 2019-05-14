@@ -177,7 +177,9 @@ to stop the loop.
 * :never  : does nothing (use it if you enabled client auto commit)
 * :poll   : commit last read offset after processing all the items of a poll
 * :record : commit the offset of every processed record
-
+  
+  if you want to commit messages yourself, set commit policy to `:never` and use `commit-message-offset` or `commit-sync`
+  
 ### Returns
               stop-fn: callback function to stop the loop"
   [consumer-conf
