@@ -6,12 +6,15 @@ Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 
 ## De/Serializers
 
-| TYPE                | KEYWORD    |
-|---------------------|------------|
-| String              | `:string`  |
-| Json                | `:json`    |
-| Transit MessagePack | `:t+mpack` |
-| Transit Json        | `:t+json`  |
+| TYPE                | KEYWORD      |
+|---------------------|--------------|
+| String              | `:string`    |
+| Json                | `:json`      |
+| Json safe           | `:json-safe` |
+| Transit MessagePack | `:t+mpack`   |
+| Transit Json        | `:t+json`    |
+
+Beware that any exception during the deserialization process (eg: malformed json) will be thrown by the poll call. This may result in a silent dead poll-loop. Using a safe deserializer is an option, it will return a map containing the raw value (as a string) and a `:felice.serialization/error` key containing the exception instead of the deserialized value of the record.
 
 ## Producing records
 ```clojure
