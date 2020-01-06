@@ -1,8 +1,10 @@
 # FELICE CHANGELOG
 
+## [2.3.1-1.1]
+
 ## [2.3.1-1.0]
 - version format changed to include kafka-clients version
-- bump deps 
+- bump deps
 
 ## [0.1.0]
 - basic `producer`
