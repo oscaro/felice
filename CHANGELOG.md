@@ -1,6 +1,7 @@
 # FELICE CHANGELOG
 
 ## [2.3.1-1.1]
+- auto coercer consumer config for java int type
 
 ## [2.3.1-1.0]
 - version format changed to include kafka-clients version
