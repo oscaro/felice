@@ -33,7 +33,7 @@
   [cfg]
   (->> cfg 
        (map (fn [[k v]]
-              (let [coerce-fn (get-in CONF-COERCERS k)
+              (let [coerce-fn (get CONF-COERCERS (keyword k))
                     v* (if (and v coerce-fn) (coerce-fn v) v)]
                 [k v*])))
        (into {})))
@@ -173,8 +173,8 @@
           vd (deserializer (:value.deserializer conf))
           conf* (-> conf
                     (dissoc :key.deserializer :value.deserializer :topics)
-                    walk/stringify-keys
-                    coerce-consumer-config)
+                    coerce-consumer-config
+                    walk/stringify-keys)
           kc (KafkaConsumer. conf* kd vd)]
       (when-let [topics (:topics conf)]
         (apply subscribe kc topics))
