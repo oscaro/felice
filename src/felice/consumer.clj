@@ -24,7 +24,9 @@
                     :receive.buffer.bytes      int
                     :request.timeout.ms        int
                     :send.buffer.bytes         int  
-                    :session.timeout.ms        int})
+                    :session.timeout.ms        int
+                    :sasl.login.refresh.buffer.seconds     short
+                    :sasl.login.refresh.min.period.seconds short})
 
 
 (defn- coerce-consumer-config
