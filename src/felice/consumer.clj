@@ -9,6 +9,36 @@
            org.apache.kafka.common.errors.WakeupException
            java.time.Duration))
 
+
+(def CONF-COERCERS {:auto.commit.interval.ms   int
+                    :connections.max.idle.ms   int
+                    :default.api.timeout.ms    int 
+                    :fetch.max.bytes           int
+                    :fetch.max.wait.ms         int
+                    :fetch.min.bytes           int
+                    :heartbeat.interval.ms     int
+                    :max.partition.fetch.bytes int
+                    :max.poll.interval.ms      int  
+                    :max.poll.records          int
+                    :metrics.num.samples       int 
+                    :receive.buffer.bytes      int
+                    :request.timeout.ms        int
+                    :send.buffer.bytes         int  
+                    :session.timeout.ms        int
+                    :sasl.login.refresh.buffer.seconds     short
+                    :sasl.login.refresh.min.period.seconds short})
+
+
+(defn- coerce-consumer-config
+  [cfg]
+  (->> cfg 
+       (map (fn [[k v]]
+              (let [coerce-fn (get CONF-COERCERS (keyword k))
+                    v* (if (and v coerce-fn) (coerce-fn v) v)]
+                [k v*])))
+       (into {})))
+
+
 ;; ## COMMIT FUNCTIONS
 
 (defn commit-sync
@@ -141,8 +171,11 @@
   ([conf]
     (let [kd (deserializer (:key.deserializer conf))
           vd (deserializer (:value.deserializer conf))
-          kc (KafkaConsumer. (walk/stringify-keys (dissoc conf :key.deserializer :value.deserializer :topics))
-                             kd vd)]
+          conf* (-> conf
+                    (dissoc :key.deserializer :value.deserializer :topics)
+                    coerce-consumer-config
+                    walk/stringify-keys)
+          kc (KafkaConsumer. conf* kd vd)]
       (when-let [topics (:topics conf)]
         (apply subscribe kc topics))
       kc))

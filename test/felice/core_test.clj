@@ -42,7 +42,9 @@
 (deftest client
   (testing "produce and consume strings"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
-          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" :group.id "test-1"
+          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" 
+                                       :group.id "test-1"
+                                       :max.poll.records 100
                                        :auto.offset.reset "earliest"} :string :string)
           topic "topic"]
       (create-topic topic)
