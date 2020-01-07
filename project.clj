@@ -1,4 +1,4 @@
-(defproject com.oscaro/felice "2.3.1-1.1-SNAPSHOT"
+(defproject com.oscaro/felice "2.3.1-1.1"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :repositories [["oscaro-releases"  {:url "https://artifactory.oscaroad.com/artifactory/libs-release-local"}]
