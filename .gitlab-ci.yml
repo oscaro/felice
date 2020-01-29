@@ -4,7 +4,14 @@ image: clojure:latest
 pages:
   stage: deploy
   tags:
-  - docker
+  - shell
+  
+  before_script:
+  - wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+  - chmod a+x lein
+  - export LEIN_ROOT=1
+  - PATH=$PATH:.
+  
   script:
   - lein codox
   artifacts:
