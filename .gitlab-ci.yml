@@ -1,3 +1,6 @@
+## https://docs.gitlab.com/ee/user/project/pages/getting_started_part_four.html#image
+image: clojure:latest
+
 pages:
   stage: deploy
   script:
