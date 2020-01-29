@@ -3,6 +3,8 @@ image: clojure:latest
 
 pages:
   stage: deploy
+  tags:
+  - docker
   script:
   - lein codox
   artifacts:
