@@ -6,6 +6,7 @@ pages:
   tags:
   - docker
   script:
+  - apt install wget -y
   - wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
   - chmod a+x lein
   - export LEIN_ROOT=1
