@@ -1,16 +1,17 @@
 ## https://docs.gitlab.com/ee/user/project/pages/getting_started_part_four.html#image
-image: clojure:latest
 
 pages:
   stage: deploy
   tags:
-  - docker
-  script:
-  - apt update && apt install wget -y
+  - shell
+  
+  before_script:
   - wget https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
   - chmod a+x lein
   - export LEIN_ROOT=1
   - PATH=$PATH:.
+  
+  script:
   - lein codox
   artifacts:
     paths:
