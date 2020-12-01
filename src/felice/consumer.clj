@@ -217,8 +217,8 @@ to stop the loop.
               stop-fn: callback function to stop the loop"
   [consumer-conf
    process-record-fn
-   & [{:keys [poll-timeout auto-close? on-error-fn commit-policy]
-       :or {poll-timeout 2000}}]]
+   {:keys [poll-timeout auto-close? on-error-fn commit-policy]
+    :or {poll-timeout 2000}}]
   (let [consumer   (consumer consumer-conf)
         continue?  (atom true)
         completion (future
