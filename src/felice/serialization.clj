@@ -29,7 +29,8 @@
 
 (def json-mapper
   (json/object-mapper {:encode-key-fn name
-                       :decode-key-fn keyword}))
+                       :decode-key-fn keyword
+                       :date-format "yyyy-MM-dd'T'HH:mm:ss.SSSX"}))
 
 (defn json-serializer []
   (reify
