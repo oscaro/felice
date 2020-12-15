@@ -1,5 +1,8 @@
 # FELICE CHANGELOG
 
+## [2.6.0-1.2]
+- kafka clients 2.6.0
+
 ## [2.5.0-1.2]
 - kafka clients 2.5.0
 - json date formatter with millis
