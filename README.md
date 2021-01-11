@@ -25,9 +25,13 @@ Beware that any exception during the deserialization process (eg: malformed json
                              :key.serializer :string             ;required
                              :value.serializer :t+json           ;required
                              :close.timeout.ms Long/MAX_VALUE}
+  ;; publish without key
   (fp/send! producer "topic1" "value")
+  ;; publish with a key
   (fp/send! producer "topic2" "key" "value")
+  ;; map syntax
   (fp/send! producer {:topic "topic3" :key "key" :value "value"})
+  ;; remember to close you producer
   (fp/close! producer))
 ```
 
@@ -41,16 +45,20 @@ Beware that any exception during the deserialization process (eg: malformed json
                     topic partition offset timestamp key value)))
 
 ;see http://kafka.apache.org/documentation/#producerconfigs
-(let [consumer-cfg {:bootstrap.servers "localhost:9092" ;required
-                    :group.id "my-group"                ;required
-                    :auto.offset.reset "latest"         ;or "earliest", used at first startup only
-                    :key.serializer    :string          ;required
-                    :value.serializer  :json            ;required
+(def consumer-cfg {:bootstrap.servers "localhost:9092" ;required
+                    :group.id "my-group"               ;required
+                    :auto.offset.reset "latest"        ;or "earliest", used at first startup only
+                    :key.serializer    :string         ;required
+                    :value.serializer  :json           ;required
                     :enable.auto.commit true
-                    :auto.commit.interval.ms 5000       ;delay between auto commits
-                    :topics #{"topic1" "topic2"}        ;auto subscribes at startup
-                    :close.timeout.ms Long/MAX_VALUE}
-      consumer (fc/consumer consumer-cfg)]
+                    :auto.commit.interval.ms 5000      ;delay between auto commits
+                    :topics #{"topic1" "topic2"}       ;auto subscribes at startup
+                    :close.timeout.ms Long/MAX_VALUE})
+```
+
+### Do it yourself
+```clojure
+(let [consumer (fc/consumer consumer-cfg)]
 
 ;; subscribe can take multiple topics at once
   (fc/subscribe consumer "topic1" "topic2")
@@ -62,10 +70,37 @@ Beware that any exception during the deserialization process (eg: malformed json
         records (fc/consumer-records->all-records cr)]
     (doseq [record records] (print-record record))
     (fc/close! consumer))
+```
 
+### Using `poll-loop` or `poll-loops`
+```clojure
 ;; poll-loop
   (let [stop-fn (fc/poll-loop consumer-cfg print-record)]
-    (Thread/sleep 10000)
+    ;; consumes in a future thread
+    ;; call the returned fn when you want to stop polling
     (stop-fn))
+;; poll-loops
+  (let [stop-fn (fc/poll-loops consumer-cfg print-record {:threads-by-topic 4})]
+    ;; spawns 4 consumers by registered topic, each in its own future thread
+    ;; call the returned fn when you want to stop polling
+    (stop-fn))
+```
 
+#### commit policy
+* `:never`   does nothing (use it if you enabled client auto commit)
+* `:poll`    commit last read offset after processing all the items of a poll
+* `:record`  commit the offset of every processed record
+
+#### Multi-threading
+  You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
+  * `:threads`           spawn N threads total (each thread listening all registered topic)
+  * `:threads-by-topic`  spawn N threads for each registered topic
+  * you can also provide a map {:topic :threads} instead of a list of topics
+
+#### Examples
+```clojure
+;; Commit after each record processed spawning 8 threads (4 for topic1 and 4 for topic2)
+(fc/poll-loops consumer-cfg print-record ["topic1" "topic2"] {:commit-policy :record :threads-by-topic 4})
+;; No committing 1 thread for topic1 and 4 for topic2
+(fc/poll-loops consumer-cfg print-record {"topic1" 1 "topic2" 4} {:commit-policy :never})
 ```
