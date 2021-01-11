@@ -273,7 +273,7 @@
 
   if you want to commit messages yourself, set commit policy to `:never` and use `commit-message-offset` or `commit-sync`
 
-### Multi-threading
+#### Multi-threading
   You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
   * :threads          : spawn N threads total (each thread listening all registered topic)
   * :threads-by-topic : spawn N threads for each registered topic
@@ -281,6 +281,7 @@
 
 ### Returns
               stop-fn: callback function to stop the loop"
+  ([comsumer-conf process-record-fn] (poll-loops consumer-conf process-record-fn {}))
   ([consumer-conf process-record-fn {:as opts}]
    (if-let [topics (:topics consumer-conf)]
      (poll-loops consumer-conf process-record-fn topics opts)
