@@ -281,7 +281,7 @@
 
 ### Returns
               stop-fn: callback function to stop the loop"
-  ([comsumer-conf process-record-fn] (poll-loops consumer-conf process-record-fn {}))
+  ([consumer-conf process-record-fn] (poll-loops consumer-conf process-record-fn {}))
   ([consumer-conf process-record-fn {:as opts}]
    (if-let [topics (:topics consumer-conf)]
      (poll-loops consumer-conf process-record-fn topics opts)
