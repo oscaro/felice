@@ -297,7 +297,8 @@
                        (let [[topic threads] (if (map-entry? topic)
                                                topic
                                                [topic (or threads-by-topic 1)])]
-                         (poll-loops* consumer-conf process-record-fn [topic] opts threads))))))]
+                         (poll-loops* consumer-conf process-record-fn [topic] opts
+                                      (or threads threads-by-topic 1)))))))]
      (fn
        ([]        (doall (for [loop loops] (loop))))
        ([timeout] (doall (for [loop loops] (loop timeout))))))))
