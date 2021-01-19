@@ -1,5 +1,8 @@
 # FELICE CHANGELOG
 
+## [2.6.0-1.3]
+- allow multi-threading with poll-loops
+
 ## [2.6.0-1.2]
 - kafka clients 2.6.0
 

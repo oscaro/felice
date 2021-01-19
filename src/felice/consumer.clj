@@ -12,18 +12,18 @@
 
 (def CONF-COERCERS {:auto.commit.interval.ms   int
                     :connections.max.idle.ms   int
-                    :default.api.timeout.ms    int 
+                    :default.api.timeout.ms    int
                     :fetch.max.bytes           int
                     :fetch.max.wait.ms         int
                     :fetch.min.bytes           int
                     :heartbeat.interval.ms     int
                     :max.partition.fetch.bytes int
-                    :max.poll.interval.ms      int  
+                    :max.poll.interval.ms      int
                     :max.poll.records          int
-                    :metrics.num.samples       int 
+                    :metrics.num.samples       int
                     :receive.buffer.bytes      int
                     :request.timeout.ms        int
-                    :send.buffer.bytes         int  
+                    :send.buffer.bytes         int
                     :session.timeout.ms        int
                     :sasl.login.refresh.buffer.seconds     short
                     :sasl.login.refresh.min.period.seconds short})
@@ -31,7 +31,7 @@
 
 (defn- coerce-consumer-config
   [cfg]
-  (->> cfg 
+  (->> cfg
        (map (fn [[k v]]
               (let [coerce-fn (get CONF-COERCERS (keyword k))
                     v* (if (and v coerce-fn) (coerce-fn v) v)]
@@ -179,6 +179,8 @@
       (when-let [topics (:topics conf)]
         (apply subscribe kc topics))
       kc))
+  ([conf topics]
+   (consumer (assoc conf :topics topics)))
   ([conf key-deserializer value-deserializer]
     (consumer (assoc conf :key.deserializer key-deserializer
                           :value.deserializer value-deserializer)))
@@ -196,9 +198,35 @@
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
 
 
+(defn poll-loop*
+  [consumer
+   process-record-fn
+   {:keys [poll-timeout on-error-fn commit-policy close-timeout-ms]
+    :or {poll-timeout 2000 close-timeout-ms 5000}}]
+  (let [continue?  (atom true)
+        completion (future
+                     (try
+                       (while @continue?
+                         (try
+                           (poll-and-process consumer poll-timeout process-record-fn commit-policy)
+                           (catch WakeupException _)
+                           (catch Throwable t
+                             (if on-error-fn (on-error-fn t))
+                             (throw t))))
+                       :stopped
+                       (catch Throwable t t)
+                       (finally
+                         (close! consumer (or close-timeout-ms Long/MAX_VALUE)))))]
+    (fn
+      ([]
+       (reset! continue? false)
+       (deref completion))
+      ([timeout]
+       (deref completion timeout :polling)))))
+
 (defn poll-loop
-  "Start a consumer loop, calling a callback for each record, and returning a funcion
-to stop the loop.
+  "Start a consumer loop, calling a callback for each record, and returning a function
+  to stop the loop.
 
 ### Parameters
              consumer: consumer config (see consumer)
@@ -210,33 +238,67 @@ to stop the loop.
 * :never  : does nothing (use it if you enabled client auto commit)
 * :poll   : commit last read offset after processing all the items of a poll
 * :record : commit the offset of every processed record
-  
+
   if you want to commit messages yourself, set commit policy to `:never` and use `commit-message-offset` or `commit-sync`
-  
+
 ### Returns
               stop-fn: callback function to stop the loop"
-  [consumer-conf
-   process-record-fn
-   {:keys [poll-timeout auto-close? on-error-fn commit-policy]
-    :or {poll-timeout 2000}}]
-  (let [consumer   (consumer consumer-conf)
-        continue?  (atom true)
-        completion (future
-                     (try
-                       (while @continue?
-                         (try
-                           (poll-and-process consumer poll-timeout process-record-fn commit-policy)
-                           (catch WakeupException _)
-                           (catch Throwable t
-                             (if on-error-fn (on-error-fn t))
-                                             (throw t))))
-                       :stopped
-                       (catch Throwable t t)
-                       (finally
-                           (close! consumer (:close.timeout.ms consumer-conf Long/MAX_VALUE)))))]
-    (fn
-      ([]
-       (reset! continue? false)
-       (deref completion))
-      ([timeout]
-       (deref completion timeout :polling)))))
+  ([consumer-conf process-record-fn] (poll-loop consumer-conf process-record-fn {}))
+  ([consumer-conf process-record-fn opts]
+   (let [consumer (consumer consumer-conf)]
+     (poll-loop* consumer process-record-fn opts))))
+
+(defn poll-loops* [consumer-conf process-record-fn topics opts threads]
+  (for [n (range threads)
+        :let [consumer (consumer consumer-conf topics)]]
+    (poll-loop* consumer process-record-fn opts)))
+
+(defn poll-loops
+  "Start consumer loops, calling a callback for each record, and returning a function
+  to stop the loops.
+
+### Parameters
+             consumer: consumer config (see consumer)
+    process-record-fn: function to call with each record polled
+               topics: topics you want to subscribe to
+              options: {:poll-timeout 2000 ; duration of a polling without events (ms)
+                        :on-error-fn  (fn [ex] ...); called on exception
+                        :commit-policy :never ; #{:never :poll :record}
+                        :threads-by-topic 1 ; number of spawned consumers for each topic
+                        :threads 1 ; number of spawned consumers}
+#### commit policy
+* :never  : does nothing (use it if you enabled client auto commit)
+* :poll   : commit last read offset after processing all the items of a poll
+* :record : commit the offset of every processed record
+
+  if you want to commit messages yourself, set commit policy to `:never` and use `commit-message-offset` or `commit-sync`
+
+#### Multi-threading
+  You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
+  * :threads          : spawn N threads total (each thread listening all registered topic)
+  * :threads-by-topic : spawn N threads for each registered topic
+  * you can also provide a map {:topic :threads} instead of a list of topics
+
+### Returns
+              stop-fn: callback function to stop the loop"
+  ([consumer-conf process-record-fn] (poll-loops consumer-conf process-record-fn {}))
+  ([consumer-conf process-record-fn {:as opts}]
+   (if-let [topics (:topics consumer-conf)]
+     (poll-loops consumer-conf process-record-fn topics opts)
+     (throw (ex-info "topics configuration is missing"
+                     {:consumer-configuration consumer-conf
+                      :info "you must specify a (list of )topic(s) either in the consumer config or using the 4 params arity of 'poll-loops'"}))))
+  ([consumer-conf process-record-fn topics {:keys [threads threads-by-topic] :as opts}]
+   (let [loops
+         (doall
+          (if (and threads (nil? threads-by-topic))
+            (poll-loops* consumer-conf process-record-fn topics opts threads)
+            (flatten (for [topic topics]
+                       (let [[topic threads] (if (map-entry? topic)
+                                               topic
+                                               [topic (or threads-by-topic 1)])]
+                         (poll-loops* consumer-conf process-record-fn [topic] opts
+                                      (or threads threads-by-topic 1)))))))]
+     (fn
+       ([]        (doall (for [loop loops] (loop))))
+       ([timeout] (doall (for [loop loops] (loop timeout))))))))
