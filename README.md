@@ -104,3 +104,19 @@ Beware that any exception during the deserialization process (eg: malformed json
 ;; No committing 1 thread for topic1 and 4 for topic2
 (fc/poll-loops consumer-cfg print-record {"topic1" 1 "topic2" 4} {:commit-policy :never})
 ```
+
+#### Partitionning
+The partitionner used by a producer can be set using this configuration key:  https://kafka.apache.org/documentation/#producerconfigs_partitioner.class 
+Default partitionner implementation:
+https://github.com/a0x8o/kafka/blob/master/clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java#L65-L71
+
+There is a comment at the bottom of the felice.producer namespace mimiking the default partitionner if you want to see the result for some keys.
+
+```clojure
+;; default partitionner
+(import 'org.apache.kafka.common.utils.Utils)
+(defn partition-from-bytes [partion-count bytes]
+  (mod (Utils/toPositive (Utils/murmur2 bytes)) 12))
+(defn partition-from-string [partition-count string]
+  partition-from-bytes partition-count (.getBytes string)))
+```
