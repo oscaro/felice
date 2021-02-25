@@ -85,8 +85,8 @@ with the 1 argument arity, :key.serializer and :value.serializer must be provide
 (comment
   ;; default partitionner
   (import 'org.apache.kafka.common.utils.Utils)
-  (defn partition-from-bytes [partion-count bytes]
-    (mod (Utils/toPositive (Utils/murmur2 bytes)) 12))
+  (defn partition-from-bytes [partition-count bytes]
+    (mod (Utils/toPositive (Utils/murmur2 bytes)) partition-count))
   (defn partition-from-string [partition-count string]
     (partition-from-bytes partition-count (.getBytes string)))
   )
