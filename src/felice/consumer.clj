@@ -72,7 +72,16 @@
   [^KafkaConsumer consumer]
   (map (fn [m] (metric->map (.getValue m))) (.metrics consumer)))
 
-(defn ^:no-doc partitions-for [^KafkaConsumer consumer])
+(defn topic-partition->map
+  "converts a TopicPartition object to a clojure map containing :topic and :partition"
+  [^TopicPartition topic-partition]
+  {:partition (.partition topic-partition)
+   :topic     (.topic topic-partition)})
+
+(defn assignment
+  "returns a set of topic-partition map currently assigned to this consumer."
+  [^KafkaConsumer consumer]
+  (set (map topic-partition->map (.assignment consumer))))
 
 (defn subscription
   "returns the set of currenctly subscribed topics"
@@ -107,13 +116,6 @@
   The thread which is blocking in an operation will throw WakeupException. If no thread is blocking in a method which can throw WakeupException, the next call to such a method will raise it instead."
   [^KafkaConsumer consumer]
   (.wakeup consumer))
-
-
-(defn topic-partition->map
-  "converts a TopicPartition object to a clojure map containing :topic and :partition"
-  [^TopicPartition topic-partition]
-  {:partition (.partition topic-partition)
-   :topic     (.topic topic-partition)})
 
 (defn consumer-record->map
   "transforms a ConsumerRecord to a clojure map containing :key :value :offset :topic :partition :timestamp :timestamp-type and :header "
