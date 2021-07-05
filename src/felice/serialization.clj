@@ -80,7 +80,7 @@
                     :t+json  (partial transit-deserializer :json)
                     :t+mpack (partial transit-deserializer :msgpack)})
 
-(defn ^serializer serializer [s]
+(defn ^Serializer serializer [s]
   (if (keyword? s)
     (if-let [serializer (serializers s)]
       (serializer)
@@ -89,7 +89,7 @@
                        :allowed (keys serializers)})))
     s))
 
-(defn ^deserializer deserializer [d]
+(defn ^Deserializer deserializer [d]
   (if (keyword? d)
     (if-let [deserializer (deserializers d)]
       (deserializer)
