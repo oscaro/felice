@@ -1,7 +1,7 @@
 (ns ^:no-doc felice.serialization
   (:require [cognitect.transit :as transit]
             [jsonista.core :as json]
-            [taoensso.nipp :as nippy])
+            [taoensso.nippy :as nippy])
   (:import [org.apache.kafka.common.serialization Serializer       Deserializer
                                                   LongSerializer   LongDeserializer
                                                   StringSerializer StringDeserializer]
