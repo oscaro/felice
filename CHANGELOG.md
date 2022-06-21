@@ -1,5 +1,9 @@
 # FELICE CHANGELOG
 
+## SNAPSHOT
+
+- Nippy deserializer
+
 ## [2.6.0-1.4]
 - consumer/assigment added
 
