@@ -1,4 +1,6 @@
-# FELICE
+<p align="center"><img src="https://cdn.radiofrance.fr/s3/cruiser-production/2022/04/b451398b-19b2-41fa-be15-509f21d8e193/560x315_gettyimages-141554383.webp" /></p>
+
+# Felice
 
 Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 
@@ -13,10 +15,17 @@ Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 | Json safe           | `:json-safe` |
 | Transit MessagePack | `:t+mpack`   |
 | Transit Json        | `:t+json`    |
+| Nippy Fast          | `:nippy+fast`|
+| Nippy LZ4           | `:nippy+lz4` |
 
-Beware that any exception during the deserialization process (eg: malformed json) will be thrown by the poll call. This may result in a silent dead poll-loop. Using a safe deserializer is an option, it will return a map containing the raw value (as a string) and a `:felice.serialization/error` key containing the exception instead of the deserialized value of the record.
+Beware that any exception during the deserialization process (eg: malformed json) will be thrown by the poll call. 
+This may result in a silent dead poll-loop. 
+
+Using a safe deserializer is an option, it will return a map containing the raw value (as a string) 
+and a `:felice.serialization/error` key containing the exception instead of the deserialized value of the record.
 
 ## Producing records
+
 ```clojure
 (require '[felice.producer :as fp])
 
@@ -57,6 +66,7 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 ### Do it yourself
+
 ```clojure
 (let [consumer (fc/consumer consumer-cfg)]
 
@@ -73,6 +83,7 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 ### Using `poll-loop` or `poll-loops`
+
 ```clojure
 ;; poll-loop
   (let [stop-fn (fc/poll-loop consumer-cfg print-record)]
@@ -87,17 +98,20 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 #### commit policy
+
 * `:never`   does nothing (use it if you enabled client auto commit)
 * `:poll`    commit last read offset after processing all the items of a poll
 * `:record`  commit the offset of every processed record
 
 #### Multi-threading
-  You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
-  * `:threads`           spawn N threads total (each thread listening all registered topic)
-  * `:threads-by-topic`  spawn N threads for each registered topic
-  * you can also provide a map {:topic :threads} instead of a list of topics
+
+You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
+* `:threads`           spawn N threads total (each thread listening all registered topic)
+* `:threads-by-topic`  spawn N threads for each registered topic
+* you can also provide a map {:topic :threads} instead of a list of topics
 
 #### Examples
+
 ```clojure
 ;; Commit after each record processed spawning 8 threads (4 for topic1 and 4 for topic2)
 (fc/poll-loops consumer-cfg print-record ["topic1" "topic2"] {:commit-policy :record :threads-by-topic 4})
@@ -106,6 +120,7 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 #### Partitionning
+
 The partitionner used by a producer can be set using this configuration key:  https://kafka.apache.org/documentation/#producerconfigs_partitioner.class 
 Default partitionner implementation:
 https://github.com/a0x8o/kafka/blob/master/clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java#L65-L71
