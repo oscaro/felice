@@ -2,9 +2,12 @@
 
 # Felice
 
-Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
+Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure. 
 
-[API docs](https://it-dev.pages.oscaroad.com/felice/)
+Built with simplicity it mind, it support by default JSON, Transit & Nippy (Fast | LZ4) and
+provide also custom Serializer / Deserializer mechanism
+
+See [API docs](https://it-dev.pages.oscaroad.com/felice/)
 
 ## De/Serializers
 
@@ -97,7 +100,7 @@ and a `:felice.serialization/error` key containing the exception instead of the 
     (stop-fn))
 ```
 
-#### commit policy
+#### Commit policy
 
 * `:never`   does nothing (use it if you enabled client auto commit)
 * `:poll`    commit last read offset after processing all the items of a poll
@@ -121,9 +124,9 @@ You can set either :threads-by-topic or :threads option (if both are set, :threa
 
 #### Partitionning
 
-The partitionner used by a producer can be set using this configuration key:  https://kafka.apache.org/documentation/#producerconfigs_partitioner.class 
-Default partitionner implementation:
-https://github.com/a0x8o/kafka/blob/master/clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java#L65-L71
+The partitionner used by a producer can be set using this [configuration key](https://kafka.apache.org/documentation/#producerconfigs_partitioner.class).
+
+See [default](https://github.com/a0x8o/kafka/blob/master/clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java#L65-L71) partitionner implementation
 
 There is a comment at the bottom of the felice.producer namespace mimiking the default partitionner if you want to see the result for some keys.
 
