@@ -73,43 +73,56 @@
 
 ;;; nippy
 
-
-(defn nippy-serializer ^Serializer []
+(defn nippy-serializer ^Serializer [type]
   (reify
     Serializer
     (close [this])
     (configure [this config is-key?])
     (serialize [this topic payload]
-      (nippy/fast-freeze payload))))
+      (condp = type
+        :fast (nippy/fast-freeze payload)
+        :lz4  (nippy/freeze payload {:incl-metadata? false
+                                     :compressor nippy/lz4-compressor}))
+      )))
 
-(defn nippy-deserializer ^Deserializer []
+(defn nippy-deserializer ^Deserializer [type]
   (reify
     Deserializer
     (close [this])
     (configure [this config is-key?])
     (deserialize [this topic payload]
       (try
-        (nippy/fast-thaw payload)
+        (condp = type
+          :fast (nippy/fast-thaw payload)
+          :lz4  (nippy/thaw payload {:incl-metadata? false
+                                     :compressor nippy/lz4-compressor}))
         (catch Exception e
           (throw (ex-info "corrupted nippy byte array"
                           {:cause e
                            :topic topic})))))))
 
+;;; references
 
-(def serializers {:long     (fn [] (LongSerializer.))
-                  :string   (fn [] (StringSerializer.))
-                  :json     json-serializer
-                  :t+json   (partial transit-serializer :json)
-                  :t+mpack  (partial transit-serializer :msgpack)
-                  :nippy    nippy-serializer})
+(def serializers {:long       (fn [] (LongSerializer.))
+                  :string     (fn [] (StringSerializer.))
+                  :json       json-serializer
+                  :t+json     (partial transit-serializer :json)
+                  :t+mpack    (partial transit-serializer :msgpack)
+                  ;; TODO: Implement password encryption mechanism
+                  ;; in the constructor for Nippy
+                  :nippy+fast (partial nippy-serializer :fast)
+                  :nippy+lz4  (partial nippy-serializer :lz4)})
 
-(def deserializers {:long    (fn [] (LongDeserializer.))
-                    :string  (fn [] (StringDeserializer.))
-                    :json    json-deserializer
-                    :json-safe    json-safe-deserializer
-                    :t+json  (partial transit-deserializer :json)
-                    :t+mpack (partial transit-deserializer :msgpack)
-                    :nippy  nippy-deserializer})
+(def deserializers {:long       (fn [] (LongDeserializer.))
+                    :string     (fn [] (StringDeserializer.))
+                    :json       json-deserializer
+                    :json-safe  json-safe-deserializer
+                    :t+json     (partial transit-deserializer :json)
+                    :t+mpack    (partial transit-deserializer :msgpack)
+                    :nippy+fast (partial nippy-deserializer :fast)
+                    :nippy+lz4  (partial nippy-deserializer :lz4)})
+
+;;; implementation
 
 (defn ^Serializer serializer [s]
   (if (keyword? s)
