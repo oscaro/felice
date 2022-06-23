@@ -42,7 +42,7 @@
 (deftest client
   (testing "produce and consume strings"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
-          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" 
+          consumer (consumer/consumer {:bootstrap.servers "localhost:9092"
                                        :group.id "test-1"
                                        :max.poll.records 100
                                        :auto.offset.reset "earliest"} :string :string)
@@ -215,4 +215,3 @@
         (is (= {"pc-0" 5 "pc-1" 4 "pc-2" 3 "pc-3" 2 "pc-4" 1}
                @stats)))
       (producer/close! producer))))
-
