@@ -1,0 +1,34 @@
+name: Clojure CI
+
+on:
+  push:
+    branches: [ "master", "devel" ]
+  pull_request:
+    branches: [ "master", "devel" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: lein -U deps
+    - name: Setup Test environnement
+      run: docker-compose -f docker-compose.yml up -d
+    - name: Run tests
+      run: lein test
+    - name: Deploy
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel'
+      run: lein deploy
+      env:
+        CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+        CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+    - name: Generate documentation
+      if: github.ref == 'refs/heads/master'
+      run: lein marg -d public -f index.html
+    - name: Deploy documentation to Github Pages
+      uses: JamesIves/github-pages-deploy-action@v4.3.3
+      if: github.ref == 'refs/heads/master'
+      with:
+        branch: gh-pages
+        folder: public

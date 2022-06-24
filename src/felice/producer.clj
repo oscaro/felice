@@ -95,11 +95,3 @@
   Calling close with no timeout is equivalent to close(Long.MAX_VALUE, TimeUnit.MILLISECONDS)"
   ([^KafkaProducer producer]         (.close producer))
   ([^KafkaProducer producer timeout] (.close producer timeout TimeUnit/MILLISECONDS)))
-
-(comment
-  ;; default partitionner
-  (import 'org.apache.kafka.common.utils.Utils)
-  (defn partition-from-bytes [partition-count bytes]
-    (mod (Utils/toPositive (Utils/murmur2 bytes)) partition-count))
-  (defn partition-from-string [partition-count string]
-    (partition-from-bytes partition-count (.getBytes string))))
