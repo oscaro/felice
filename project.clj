@@ -1,9 +1,6 @@
 (defproject com.oscaro/felice "3.2.0-1.6-SNAPSHOT"
   :description "Felice is client library for Apache Kafka in Clojure"
   :url "https://gitlab.oscaroad.com/it-dev/felice"
-  :repositories [["oscaro-releases"  {:url "https://artifactory.oscaroad.com/artifactory/libs-release-local"}]
-                 ["oscaro-snapshots" {:url "https://artifactory.oscaroad.com/artifactory/libs-snapshot-local"}]
-                 ["oscaro-remote"    {:url "https://artifactory.oscaroad.com/artifactory/remote-repos"}]]
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :plugins [[lein-marginalia "0.9.1"]]
