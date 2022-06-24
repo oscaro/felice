@@ -1,4 +1,4 @@
-(defproject com.oscaro/felice "2.6.0-1.5-SNAPSHOT"
+(defproject com.oscaro/felice "3.2.0-1.5-SNAPSHOT"
   :description "Felice is client library for Apache Kafka in Clojure"
   :url "https://gitlab.oscaroad.com/it-dev/felice"
   :repositories [["oscaro-releases"  {:url "https://artifactory.oscaroad.com/artifactory/libs-release-local"}]
@@ -10,7 +10,7 @@
   :codox {:output-path "public"
           :source-uri "https://gitlab.oscaroad.com/it-dev/felice/blob/{git-commit}/{filepath}#L{line}"}
   :dependencies [[org.clojure/clojure            "1.10.1"]
-                 [org.apache.kafka/kafka-clients "2.6.0"]
+                 [org.apache.kafka/kafka-clients "3.2.0"]
                  [com.cognitect/transit-clj      "0.8.319" :exclusions [com.fasterxml.jackson.core/jackson-core]]
                  [metosin/jsonista               "0.2.5"]
                  [com.taoensso/nippy             "3.1.1"]]
