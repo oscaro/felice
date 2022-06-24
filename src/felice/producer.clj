@@ -5,7 +5,9 @@
            [org.apache.kafka.clients.producer KafkaProducer ProducerRecord Callback]))
 
 (defn flush!
-  "Invoking this method makes all buffered records immediately available to send (even if linger.ms is greater than 0) and blocks on the completion of the requests associated with these records."
+  "Invoking this method makes all buffered records immediately available
+  to send (even if linger.ms is greater than 0) and blocks on the
+  completion of the requests associated with these records."
   [^KafkaProducer producer]
   (.flush producer))
 
@@ -20,12 +22,13 @@
   (.partitionsFor producer topic))
 
 (defn ^:no-doc producer-record
-  "transforms a clojure map to a ProducerRecord object"
+  "Transforms a clojure map to a ProducerRecord object"
   [{:keys [topic key value partition timestamp headers]}]
   (ProducerRecord. topic partition timestamp key value headers))
 
 (defn ^:no-doc send-record!
-  "sends a ProducerRecord with an optional callback when the send has been acknowledged."
+  "Sends a ProducerRecord with an optional callback when the
+   send has been acknowledged."
   ([^KafkaProducer producer ^ProducerRecord record]
    (.send producer (producer-record record)))
   ([^KafkaProducer producer ^ProducerRecord record callback]
@@ -47,25 +50,33 @@
   ([^KafkaProducer producer record-map]      (send-record! producer record-map)))
 
 (defn send-with-callback!
-  "asynchronously send a record triggering the given callback when the send has been acknowledged
-  Note that callbacks will generally execute in the I/O thread of the producer and so should be reasonably fast or they will delay the sending of messages from other threads. If you want to execute blocking or computationally expensive callbacks it is recommended to use your own Executor in the callback body to parallelize processing."
+  "Asynchronously send a record triggering the given callback when the send has
+  been acknowledged.
+  Note that callbacks will generally execute in the I/O thread of the producer
+  and so should be reasonably fast or they will delay the sending of messages
+  from other threads.
+
+  If you want to execute blocking or computationally expensive callbacks it
+  is recommended to use your own Executor in the callback body to parallelize
+  processing."
   ([^KafkaProducer producer topic value cb]     (send-record! producer (->record topic value) cb))
   ([^KafkaProducer producer topic key value cb] (send-record! producer (->record topic key value) cb))
   ([^KafkaProducer producer record-map cb]      (send-record! producer record-map cb)))
 
 (defn send!!
-  "synchronously send a record - wait until acknowledged"
+  "Synchronously send a record - wait until acknowledged"
   ([^KafkaProducer producer topic value]     (send!! producer (->record topic value)))
   ([^KafkaProducer producer topic key value] (send!! producer (->record topic key value)))
   ([^KafkaProducer producer record-map] (.get (send! producer record-map))))
 
 (defn producer
-  "create a producer
+  "Create a producer
 
-  conf is a map {:keyword value} (for all  possibilities see https://kafka.apache.org/documentation/#producerconfigs)
+   `conf` is a map {:keyword value}
+   See https://kafka.apache.org/documentation/#producerconfigs for all possibilities
 
-key and value serializer can be one of :long :string :t+json :t+mpack
-with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf"
+   key and value serializer can be one of keys defined in `felice.serializer` namespace
+   with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf"
   ([conf]
    (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
                    (serializer (:key.serializer conf))
@@ -75,8 +86,12 @@ with the 1 argument arity, :key.serializer and :value.serializer must be provide
                     :value.serializer value-serializer))))
 
 (defn close!
-  "This method waits up to timeout ms for the producer to complete the sending of all incomplete requests.
-  If the producer is unable to complete all requests before the timeout expires, this method will fail any unsent and unacknowledged records immediately.
+  "This method waits up to timeout ms for the producer to complete the
+  sending of all incomplete requests.
+
+  If the producer is unable to complete all requests before the timeout
+  expires, this method will fail any unsent and unacknowledged records immediately.
+
   Calling close with no timeout is equivalent to close(Long.MAX_VALUE, TimeUnit.MILLISECONDS)"
   ([^KafkaProducer producer]         (.close producer))
   ([^KafkaProducer producer timeout] (.close producer timeout TimeUnit/MILLISECONDS)))
