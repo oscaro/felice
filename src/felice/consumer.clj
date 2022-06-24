@@ -9,7 +9,6 @@
            org.apache.kafka.common.errors.WakeupException
            java.time.Duration))
 
-
 (def CONF-COERCERS {:auto.commit.interval.ms   int
                     :connections.max.idle.ms   int
                     :default.api.timeout.ms    int
@@ -28,7 +27,6 @@
                     :sasl.login.refresh.buffer.seconds     short
                     :sasl.login.refresh.min.period.seconds short})
 
-
 (defn- coerce-consumer-config
   [cfg]
   (->> cfg
@@ -37,7 +35,6 @@
                     v* (if (and v coerce-fn) (coerce-fn v) v)]
                 [k v*])))
        (into {})))
-
 
 ;; ## COMMIT FUNCTIONS
 
@@ -135,14 +132,13 @@
   [^ConsumerRecords records]
   (map consumer-record->map (iterator-seq (.iterator records))))
 
-
 (defn poll->records-by-topic
   "takes the return of a poll (see ConsumerRecords)
   returns a map {topic records-seq}"
   [^ConsumerRecords records]
   (let [topics (map (comp :topic topic-partition->map) (.partitions records))]
     (->> topics
-         (map (fn[topic] [topic (map consumer-record->map (.records records ^String topic))]))
+         (map (fn [topic] [topic (map consumer-record->map (.records records ^String topic))]))
          (into {}))))
 
 (defn ^:no-doc poll->records-by-partition
@@ -159,7 +155,6 @@
         (commit-message-offset consumer record)))
     (when (= :poll commit-policy)
       (commit-sync consumer))))
-
 
 (defn consumer
   "create a consumer
@@ -189,8 +184,6 @@
   ([conf key-deserializer value-deserializer topics]
    (consumer (assoc conf :topics topics) key-deserializer value-deserializer)))
 
-
-
 (defn close!
   "Tries to close the consumer cleanly within the specified timeout in ms (defaults to 30 secs).
   This method waits up to timeout for the consumer to complete pending commits and leave the group.
@@ -198,7 +191,6 @@
   If the consumer is unable to complete offset commits and gracefully leave the group before the timeout expires, the consumer is force closed."
   ([^KafkaConsumer consumer]         (.close consumer))
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
-
 
 (defn poll-loop*
   [consumer

@@ -18,7 +18,7 @@
 (defn commit-message-offset [consumer message]
   (println (async/>!! (:control-chan consumer)
                       [:commit-message message]))
-            
+
   (consumer/wakeup (:consumer consumer)))
 
 (defn poll-chan
@@ -49,7 +49,7 @@
 (defn poll-chans
   [consumer poll-timeout topic->chan control-chan]
   (let [continue? (atom true)
-        completion 
+        completion
         (future
           (try
             (while @continue?
@@ -104,6 +104,5 @@
                    (async/close! records-chan)
                    (async/close! control-chan)
                    (deref polling))}))))
-
 
 (defn close! [{:keys [close!] :as consumer}] (close!))

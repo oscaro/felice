@@ -3,8 +3,8 @@
             [jsonista.core :as json]
             [taoensso.nippy :as nippy])
   (:import [org.apache.kafka.common.serialization Serializer       Deserializer
-                                                  LongSerializer   LongDeserializer
-                                                  StringSerializer StringDeserializer]
+            LongSerializer   LongDeserializer
+            StringSerializer StringDeserializer]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 ;;; transit
@@ -82,8 +82,7 @@
       (condp = type
         :fast (nippy/fast-freeze payload)
         :lz4  (nippy/freeze payload {:incl-metadata? false
-                                     :compressor nippy/lz4-compressor}))
-      )))
+                                     :compressor nippy/lz4-compressor})))))
 
 (defn nippy-deserializer ^Deserializer [type]
   (reify
