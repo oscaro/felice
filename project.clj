@@ -1,4 +1,4 @@
-(defproject com.oscaro/felice "2.6.0-1.5"
+(defproject com.oscaro/felice "3.2.0-1.5"
   :description "Felice is client library for Apache Kafka in Clojure"
   :url "https://gitlab.oscaroad.com/it-dev/felice"
   :repositories [["oscaro-releases"  {:url "https://artifactory.oscaroad.com/artifactory/libs-release-local"}]

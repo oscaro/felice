@@ -1,8 +1,9 @@
 # FELICE CHANGELOG
 
-## SNAPSHOT
+## [3.2.0-1.5]
 
-- Nippy deserializer with fast & lz4 compression
+- Kafka Client version bump
+- Nippy serdes with fast & lz4 compression
 
 ## [2.6.0-1.4]
 - consumer/assigment added
