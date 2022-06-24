@@ -2,7 +2,8 @@
 	<img src="https://raw.githubusercontent.com/oscaro/felice/devel/.github/image.png"/>
 </p>
 
-# Felice
+# Felice [![Clojars Project](https://img.shields.io/clojars/v/com.oscaro/felice.svg)](https://clojars.org/com.oscaro/felice) [![Clojure CI](https://github.com/oscaro/felice/actions/workflows/clojure.yml/badge.svg?branch=devel)](https://github.com/oscaro/felice/actions/workflows/clojure.yml)
+
 
 Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure. 
 
