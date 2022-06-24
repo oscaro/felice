@@ -1,4 +1,6 @@
-<p align="center"><img src="https://cdn.radiofrance.fr/s3/cruiser-production/2022/04/b451398b-19b2-41fa-be15-509f21d8e193/560x315_gettyimages-141554383.webp" /></p>
+<p align="center">
+	<img src="https://assets.letemps.ch/sites/default/files/styles/article_detail_desktop/public/media/2021/11/08/file79vuqsh1bkg1fcq2s6i0.jpg?h=acd92167&itok=7inwu_KU"/>
+</p>
 
 # Felice
 
@@ -138,3 +140,18 @@ There is a comment at the bottom of the felice.producer namespace mimiking the d
 (defn partition-from-string [partition-count string]
   (partition-from-bytes partition-count (.getBytes string)))
 ```
+
+## License
+
+Copyright © 2018 - 2022 Oscaro
+
+This program and the accompanying materials are made available under the
+terms of the Eclipse Public License 2.0 which is available at
+http://www.eclipse.org/legal/epl-2.0.
+
+This Source Code may also be made available under the following Secondary
+Licenses when the conditions for such availability set forth in the Eclipse
+Public License, v. 2.0 are satisfied: GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or (at your
+option) any later version, with the GNU Classpath Exception which is available
+at https://www.gnu.org/software/classpath/license.html.
