@@ -2,7 +2,8 @@
   (:require [cognitect.transit :as transit]
             [jsonista.core :as json]
             [taoensso.nippy :as nippy])
-  (:import [org.apache.kafka.common.serialization Serializer       Deserializer
+  (:import [org.apache.kafka.common.serialization
+            Serializer       Deserializer
             LongSerializer   LongDeserializer
             StringSerializer StringDeserializer]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))

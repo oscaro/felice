@@ -2,7 +2,7 @@
 
 ## SNAPSHOT
 
-- Nippy deserializer
+- Nippy deserializer with fast & lz4 compression
 
 ## [2.6.0-1.4]
 - consumer/assigment added
