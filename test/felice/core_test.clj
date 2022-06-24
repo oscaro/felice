@@ -19,8 +19,7 @@
               (throw (ex-info "failed to start docker container" r))
               (trim-newline out))]
     (println "kafka started")
-    cid
-    ))
+    cid))
 
 (defn close-docker-kafka [container]
   (println "testing done, killing kafka...")
@@ -42,7 +41,7 @@
 (deftest client
   (testing "produce and consume strings"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
-          consumer (consumer/consumer {:bootstrap.servers "localhost:9092" 
+          consumer (consumer/consumer {:bootstrap.servers "localhost:9092"
                                        :group.id "test-1"
                                        :max.poll.records 100
                                        :auto.offset.reset "earliest"} :string :string)
@@ -59,11 +58,9 @@
             records (consumer/poll->all-records consumer-records)]
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 3 (count records)))
-        (is (= "value" (:value (first records))))
-        )
+        (is (= "value" (:value (first records)))))
       (producer/close! producer)
-      (consumer/close! consumer)
-      ))
+      (consumer/close! consumer)))
 
   (testing "produce and consume json"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :t+json)
@@ -84,8 +81,7 @@
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 1 (count records)))
         (is record)
-        (is (= message (:value record)))
-        )
+        (is (= message (:value record))))
       (producer/close! producer)
       (consumer/close! consumer)))
 
@@ -108,8 +104,7 @@
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 1 (count records)))
         (is record)
-        (is (= message (:value record)))
-        )
+        (is (= message (:value record))))
       (producer/close! producer)
       (consumer/close! consumer)))
 
@@ -128,7 +123,7 @@
       (create-topic topic)
       (let [counter (atom 0)
             process-fn (fn [{:keys [topic partition offset timestamp key value]}]
-                          (swap! counter + (:zob value)))
+                         (swap! counter + (:zob value)))
             stop-fn (consumer/poll-loop consumer-cfg process-fn {:auto-close? true})]
         (producer/send! producer topic {:zob 42})
         (Thread/sleep 1000)
@@ -179,15 +174,14 @@
 
       (let [records (async/chan 100)
             consumer (fa/consumer {:bootstrap.servers "localhost:9092" :group.id "test-5"
-                                         :auto.offset.reset "earliest"
-                                         :enable.auto.commit false}
-                                        :long :long
-                                        records topic)]
+                                   :auto.offset.reset "earliest"
+                                   :enable.auto.commit false}
+                                  :long :long
+                                  records topic)]
         (is (= 2 (:key (async/<!! records))))
 
         (fa/close! consumer))
       (producer/close! producer)))
-
 
   (testing "poll-chans"
     (let [producer (producer/producer {:bootstrap.servers "localhost:9092"} :long :long)
@@ -215,4 +209,3 @@
         (is (= {"pc-0" 5 "pc-1" 4 "pc-2" 3 "pc-3" 2 "pc-4" 1}
                @stats)))
       (producer/close! producer))))
-

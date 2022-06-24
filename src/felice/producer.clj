@@ -67,12 +67,12 @@
 key and value serializer can be one of :long :string :t+json :t+mpack
 with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf"
   ([conf]
-    (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
-                    (serializer (:key.serializer conf))
-                    (serializer (:value.serializer conf))))
+   (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
+                   (serializer (:key.serializer conf))
+                   (serializer (:value.serializer conf))))
   ([conf key-serializer value-serializer]
-    (producer (assoc conf :key.serializer key-serializer
-                          :value.serializer value-serializer))))
+   (producer (assoc conf :key.serializer key-serializer
+                    :value.serializer value-serializer))))
 
 (defn close!
   "This method waits up to timeout ms for the producer to complete the sending of all incomplete requests.
@@ -80,3 +80,11 @@ with the 1 argument arity, :key.serializer and :value.serializer must be provide
   Calling close with no timeout is equivalent to close(Long.MAX_VALUE, TimeUnit.MILLISECONDS)"
   ([^KafkaProducer producer]         (.close producer))
   ([^KafkaProducer producer timeout] (.close producer timeout TimeUnit/MILLISECONDS)))
+
+(comment
+  ;; default partitionner
+  (import 'org.apache.kafka.common.utils.Utils)
+  (defn partition-from-bytes [partition-count bytes]
+    (mod (Utils/toPositive (Utils/murmur2 bytes)) partition-count))
+  (defn partition-from-string [partition-count string]
+    (partition-from-bytes partition-count (.getBytes string))))

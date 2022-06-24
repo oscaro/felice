@@ -1,10 +1,14 @@
 (ns ^:no-doc felice.serialization
   (:require [cognitect.transit :as transit]
-            [jsonista.core :as json])
-  (:import [org.apache.kafka.common.serialization Serializer       Deserializer
-                                                  LongSerializer   LongDeserializer
-                                                  StringSerializer StringDeserializer]
+            [jsonista.core :as json]
+            [taoensso.nippy :as nippy])
+  (:import [org.apache.kafka.common.serialization
+            Serializer       Deserializer
+            LongSerializer   LongDeserializer
+            StringSerializer StringDeserializer]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
+
+;;; transit
 
 (defn transit-serializer [type]
   (reify
@@ -31,6 +35,8 @@
   (json/object-mapper {:encode-key-fn name
                        :decode-key-fn keyword
                        :date-format "yyyy-MM-dd'T'HH:mm:ss.SSSX"}))
+
+;;; json
 
 (defn json-serializer []
   (reify
@@ -66,21 +72,59 @@
                {:raw-value as-string
                 ::error {:deserializing e}}))))))
 
+;;; nippy
 
-(def serializers {:long     (fn [] (LongSerializer.))
-                  :string   (fn [] (StringSerializer.))
-                  :json     json-serializer
-                  :t+json   (partial transit-serializer :json)
-                  :t+mpack  (partial transit-serializer :msgpack)})
+(defn nippy-serializer ^Serializer [type]
+  (reify
+    Serializer
+    (close [this])
+    (configure [this config is-key?])
+    (serialize [this topic payload]
+      (condp = type
+        :fast (nippy/fast-freeze payload)
+        :lz4  (nippy/freeze payload {:incl-metadata? false
+                                     :compressor nippy/lz4-compressor})))))
 
-(def deserializers {:long    (fn [] (LongDeserializer.))
-                    :string  (fn [] (StringDeserializer.))
-                    :json    json-deserializer
-                    :json-safe    json-safe-deserializer
-                    :t+json  (partial transit-deserializer :json)
-                    :t+mpack (partial transit-deserializer :msgpack)})
+(defn nippy-deserializer ^Deserializer [type]
+  (reify
+    Deserializer
+    (close [this])
+    (configure [this config is-key?])
+    (deserialize [this topic payload]
+      (try
+        (condp = type
+          :fast (nippy/fast-thaw payload)
+          :lz4  (nippy/thaw payload {:incl-metadata? false
+                                     :compressor nippy/lz4-compressor}))
+        (catch Exception e
+          (throw (ex-info "corrupted nippy byte array"
+                          {:cause e
+                           :topic topic})))))))
 
-(defn ^serializer serializer [s]
+;;; references
+
+(def serializers {:long       (fn [] (LongSerializer.))
+                  :string     (fn [] (StringSerializer.))
+                  :json       json-serializer
+                  :t+json     (partial transit-serializer :json)
+                  :t+mpack    (partial transit-serializer :msgpack)
+                  ;; TODO: Implement password encryption mechanism
+                  ;; in the constructor for Nippy
+                  :nippy+fast (partial nippy-serializer :fast)
+                  :nippy+lz4  (partial nippy-serializer :lz4)})
+
+(def deserializers {:long       (fn [] (LongDeserializer.))
+                    :string     (fn [] (StringDeserializer.))
+                    :json       json-deserializer
+                    :json-safe  json-safe-deserializer
+                    :t+json     (partial transit-deserializer :json)
+                    :t+mpack    (partial transit-deserializer :msgpack)
+                    :nippy+fast (partial nippy-deserializer :fast)
+                    :nippy+lz4  (partial nippy-deserializer :lz4)})
+
+;;; implementation
+
+(defn ^Serializer serializer [s]
   (if (keyword? s)
     (if-let [serializer (serializers s)]
       (serializer)
@@ -89,7 +133,7 @@
                        :allowed (keys serializers)})))
     s))
 
-(defn ^deserializer deserializer [d]
+(defn ^Deserializer deserializer [d]
   (if (keyword? d)
     (if-let [deserializer (deserializers d)]
       (deserializer)

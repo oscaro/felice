@@ -1,8 +1,23 @@
-# FELICE
+<p align="center">
+	<img src="https://assets.letemps.ch/sites/default/files/styles/article_detail_desktop/public/media/2021/11/08/file79vuqsh1bkg1fcq2s6i0.jpg?h=acd92167&itok=7inwu_KU"/>
+</p>
 
-Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
+# Felice
 
-[API docs](https://it-dev.pages.oscaroad.com/felice/)
+Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure. 
+
+Built with simplicity it mind, it support by default JSON, Transit & Nippy (Fast | LZ4) and
+provide also custom Serializer / Deserializer mechanism
+
+See [API docs](https://it-dev.pages.oscaroad.com/felice/)
+
+## Installation
+
+Add the latest release to your **project.clj**
+ 
+```
+[com.oscaro/felice "2.6.0-1.3"]
+```
 
 ## De/Serializers
 
@@ -13,10 +28,17 @@ Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure.
 | Json safe           | `:json-safe` |
 | Transit MessagePack | `:t+mpack`   |
 | Transit Json        | `:t+json`    |
+| Nippy Fast          | `:nippy+fast`|
+| Nippy LZ4           | `:nippy+lz4` |
 
-Beware that any exception during the deserialization process (eg: malformed json) will be thrown by the poll call. This may result in a silent dead poll-loop. Using a safe deserializer is an option, it will return a map containing the raw value (as a string) and a `:felice.serialization/error` key containing the exception instead of the deserialized value of the record.
+Beware that any exception during the deserialization process (eg: malformed json) will be thrown by the poll call. 
+This may result in a silent dead poll-loop. 
+
+Using a safe deserializer is an option, it will return a map containing the raw value (as a string) 
+and a `:felice.serialization/error` key containing the exception instead of the deserialized value of the record.
 
 ## Producing records
+
 ```clojure
 (require '[felice.producer :as fp])
 
@@ -57,6 +79,7 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 ### Do it yourself
+
 ```clojure
 (let [consumer (fc/consumer consumer-cfg)]
 
@@ -73,6 +96,7 @@ Beware that any exception during the deserialization process (eg: malformed json
 ```
 
 ### Using `poll-loop` or `poll-loops`
+
 ```clojure
 ;; poll-loop
   (let [stop-fn (fc/poll-loop consumer-cfg print-record)]
@@ -86,21 +110,56 @@ Beware that any exception during the deserialization process (eg: malformed json
     (stop-fn))
 ```
 
-#### commit policy
+#### Commit policy
+
 * `:never`   does nothing (use it if you enabled client auto commit)
 * `:poll`    commit last read offset after processing all the items of a poll
 * `:record`  commit the offset of every processed record
 
 #### Multi-threading
-  You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
-  * `:threads`           spawn N threads total (each thread listening all registered topic)
-  * `:threads-by-topic`  spawn N threads for each registered topic
-  * you can also provide a map {:topic :threads} instead of a list of topics
+
+You can set either :threads-by-topic or :threads option (if both are set, :threads-by-topic will win)
+* `:threads`           spawn N threads total (each thread listening all registered topic)
+* `:threads-by-topic`  spawn N threads for each registered topic
+* you can also provide a map {:topic :threads} instead of a list of topics
 
 #### Examples
+
 ```clojure
 ;; Commit after each record processed spawning 8 threads (4 for topic1 and 4 for topic2)
 (fc/poll-loops consumer-cfg print-record ["topic1" "topic2"] {:commit-policy :record :threads-by-topic 4})
 ;; No committing 1 thread for topic1 and 4 for topic2
 (fc/poll-loops consumer-cfg print-record {"topic1" 1 "topic2" 4} {:commit-policy :never})
 ```
+
+#### Partitionning
+
+The partitionner used by a producer can be set using this [configuration key](https://kafka.apache.org/documentation/#producerconfigs_partitioner.class).
+
+See [default](https://github.com/a0x8o/kafka/blob/master/clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java#L65-L71) partitionner implementation
+
+There is a comment at the bottom of the felice.producer namespace mimiking the default partitionner if you want to see the result for some keys.
+
+```clojure
+;; default partitionner
+(import 'org.apache.kafka.common.utils.Utils)
+(defn partition-from-bytes [partition-count bytes]
+  (mod (Utils/toPositive (Utils/murmur2 bytes)) partition-count))
+(defn partition-from-string [partition-count string]
+  (partition-from-bytes partition-count (.getBytes string)))
+```
+
+## License
+
+Copyright © 2018 - 2022 Oscaro
+
+This program and the accompanying materials are made available under the
+terms of the Eclipse Public License 2.0 which is available at
+http://www.eclipse.org/legal/epl-2.0.
+
+This Source Code may also be made available under the following Secondary
+Licenses when the conditions for such availability set forth in the Eclipse
+Public License, v. 2.0 are satisfied: GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or (at your
+option) any later version, with the GNU Classpath Exception which is available
+at https://www.gnu.org/software/classpath/license.html.
