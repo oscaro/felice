@@ -19,6 +19,8 @@ Add the latest release to your **project.clj**
 [com.oscaro/felice "2.6.0-1.3"]
 ```
 
+> Note: the version contains in a first time the [Kafka Client](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients) then the felice version, separated by hyphen.
+
 ## De/Serializers
 
 | TYPE                | KEYWORD      |
