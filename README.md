@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="https://assets.letemps.ch/sites/default/files/styles/article_detail_desktop/public/media/2021/11/08/file79vuqsh1bkg1fcq2s6i0.jpg?h=acd92167&itok=7inwu_KU"/>
+	<img src="https://raw.githubusercontent.com/oscaro/felice/devel/.github/image.png"/>
 </p>
 
 # Felice
