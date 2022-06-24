@@ -36,10 +36,12 @@
                 [k v*])))
        (into {})))
 
-;; ## COMMIT FUNCTIONS
+
+;;; Commit functions
 
 (defn commit-sync
-  "Commit offsets returned on the last `poll()` for all the subscribed list of topics and partitions.
+  "Commit offsets returned on the last `poll()` for all
+  the subscribed list of topics and partitions.
 
   consumer must be a KafkaConsumer object"
   [^KafkaConsumer consumer]
@@ -104,18 +106,31 @@
   (.position consumer (TopicPartition. topic partition)))
 
 (defn poll
-  "Fetch data for the topics or partitions specified using one of the subscribe/assign APIs. This method returns immediately if there are records available. Otherwise, it will await the timeout ms. If the timeout expires, an empty record set will be returned."
+  "Fetch data for the topics or partitions specified using
+  one of the subscribe/assign APIs.
+
+  This method returns immediately if there are records available.
+  Otherwise, it will await the timeout ms.
+
+  If the timeout expires, an empty record set will be returned."
   [^KafkaConsumer consumer timeout]
   (.poll consumer (Duration/ofMillis timeout)))
 
 (defn wakeup
-  "Wakeup the consumer. This method is thread-safe and is useful in particular to abort a long poll.
-  The thread which is blocking in an operation will throw WakeupException. If no thread is blocking in a method which can throw WakeupException, the next call to such a method will raise it instead."
+  "Wakeup the consumer. This method is thread-safe and is
+  useful in particular to abort a long poll.
+
+  The thread which is blocking in an operation will throw WakeupException.
+
+  If no thread is blocking in a method which can throw WakeupException,
+  the next call to such a method will raise it instead."
   [^KafkaConsumer consumer]
   (.wakeup consumer))
 
 (defn consumer-record->map
-  "transforms a ConsumerRecord to a clojure map containing :key :value :offset :topic :partition :timestamp :timestamp-type and :header "
+  "transforms a ConsumerRecord to a clojure map containing:
+  `:key``:value` `:offset` `:topic` `:partition` `:timestamp`
+  `:timestamp-type` and `:header`"
   [^ConsumerRecord record]
   {:key            (.key record)
    :offset         (.offset record)
@@ -138,7 +153,8 @@
   [^ConsumerRecords records]
   (let [topics (map (comp :topic topic-partition->map) (.partitions records))]
     (->> topics
-         (map (fn [topic] [topic (map consumer-record->map (.records records ^String topic))]))
+         (map (fn [topic] [topic (map consumer-record->map
+                                     (.records records ^String topic))]))
          (into {}))))
 
 (defn ^:no-doc poll->records-by-partition
@@ -159,9 +175,10 @@
 (defn consumer
   "create a consumer
 
-  conf is a map {:keyword value} (for all  possibilities see https://kafka.apache.org/documentation/#consumerconfigs)
+  conf is a map {:keyword value}
+  See: https://kafka.apache.org/documentation/#consumerconfigs for all possibilities
 
-  key and value deserializer can be one of :long :string :t+json :t+mpack
+  key and value serializer can be one of keys defined in `felice.serializer` namespace
   with the 1 argument arity, :key.deserializer and :value.deserializer must be provided in conf
 
   you can optionaly provide a list of topics to subscribe to"
@@ -185,10 +202,17 @@
    (consumer (assoc conf :topics topics) key-deserializer value-deserializer)))
 
 (defn close!
-  "Tries to close the consumer cleanly within the specified timeout in ms (defaults to 30 secs).
-  This method waits up to timeout for the consumer to complete pending commits and leave the group.
-  If auto-commit is enabled, this will commit the current offsets if possible within the timeout.
-  If the consumer is unable to complete offset commits and gracefully leave the group before the timeout expires, the consumer is force closed."
+  "Tries to close the consumer cleanly within the specified timeout in ms
+  (defaults to 30 secs).
+
+  This method waits up to timeout for the consumer to complete
+  pending commits and leave the group.
+
+  If auto-commit is enabled, this will commit the current
+  offsets if possible within the timeout.
+
+  If the consumer is unable to complete offset commits and gracefully
+  leave the group before the timeout expires, the consumer is force closed."
   ([^KafkaConsumer consumer]         (.close consumer))
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
 
@@ -233,7 +257,8 @@
 * :poll   : commit last read offset after processing all the items of a poll
 * :record : commit the offset of every processed record
 
-  if you want to commit messages yourself, set commit policy to `:never` and use `commit-message-offset` or `commit-sync`
+  if you want to commit messages yourself, set commit policy to `:never`
+  and use `commit-message-offset` or `commit-sync`
 
 ### Returns
               stop-fn: callback function to stop the loop"
