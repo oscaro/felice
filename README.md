@@ -1,23 +1,16 @@
 <p align="center">
-	<img src="https://assets.letemps.ch/sites/default/files/styles/article_detail_desktop/public/media/2021/11/08/file79vuqsh1bkg1fcq2s6i0.jpg?h=acd92167&itok=7inwu_KU"/>
+	<img src="https://raw.githubusercontent.com/oscaro/felice/devel/.github/image.png"/>
 </p>
 
-# Felice
+# Felice [![Clojars Project](https://img.shields.io/clojars/v/com.oscaro/felice.svg)](https://clojars.org/com.oscaro/felice) [![Clojure CI](https://github.com/oscaro/felice/actions/workflows/clojure.yml/badge.svg?branch=devel)](https://github.com/oscaro/felice/actions/workflows/clojure.yml)
+
 
 Felice is client library for [Apache Kafka](http://kafka.apache.org) in Clojure. 
 
 Built with simplicity it mind, it support by default JSON, Transit & Nippy (Fast | LZ4) and
 provide also custom Serializer / Deserializer mechanism
 
-See [API docs](https://it-dev.pages.oscaroad.com/felice/)
-
-## Installation
-
-Add the latest release to your **project.clj**
- 
-```
-[com.oscaro/felice "2.6.0-1.3"]
-```
+> Note: the version contains in a first time the [Kafka Client](https://mvnrepository.com/artifact/org.apache.kafka/kafka-clients) then the felice version, separated by hyphen.
 
 ## De/Serializers
 
