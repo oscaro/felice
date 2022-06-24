@@ -11,6 +11,14 @@ provide also custom Serializer / Deserializer mechanism
 
 See [API docs](https://it-dev.pages.oscaroad.com/felice/)
 
+## Installation
+
+Add the latest release to your **project.clj**
+ 
+```
+[com.oscaro/felice "2.6.0-1.3"]
+```
+
 ## De/Serializers
 
 | TYPE                | KEYWORD      |
