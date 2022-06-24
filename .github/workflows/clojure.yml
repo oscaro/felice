@@ -23,9 +23,11 @@ jobs:
       env:
         CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
         CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+    - name: Generate documentation
+      run: lein marg -d public -f index.html
     - name: Deploy documentation to Github Pages
       uses: JamesIves/github-pages-deploy-action@v4.3.3
       if: github.ref == 'refs/heads/master'
       with:
         branch: gh-pages
-        folder: docs
+        folder: public
