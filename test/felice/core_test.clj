@@ -6,7 +6,11 @@
 
             [felice.consumer :as consumer]
             [felice.producer :as producer]
-            [felice.async    :as fa]))
+            [felice.async    :as fa]
+            [unilog.config   :as ul]))
+
+(ul/start-logging! (-> ul/default-configuration
+                       (assoc :overrides {"org.apache" :warn})))
 
 (defn start-docker-kafka []
   (println "starting kafka...")
