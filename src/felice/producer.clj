@@ -4,6 +4,32 @@
   (:import java.util.concurrent.TimeUnit
            [org.apache.kafka.clients.producer KafkaProducer ProducerRecord Callback]))
 
+(def CONF-COERCERS {:retries                               int
+                    :batch.size                            int
+                    :connections.max.idle.ms               int
+                    :delivery.timeout.ms                   int
+                    :max.request.size                      int
+                    :receive.buffer.bytes                  int
+                    :request.timeout.ms                    int
+                    :send.buffer.bytes                     int
+                    :max.in.flight.requests.per.connection int
+                    :metrics.num.samples                   int
+                    :sasl.login.connect.timeout.ms         int
+                    :sasl.login.read.timeout.ms            int
+                    :sasl.login.refresh.buffer.seconds     short
+                    :sasl.login.refresh.min.period.seconds short
+                    :sasl.oauthbearer.clock.skew.seconds   int
+                    :transaction.timeout.ms                int})
+
+(defn- coerce-producer-config
+  [cfg]
+  (->> cfg
+       (map (fn [[k v]]
+              (let [coerce-fn (get CONF-COERCERS (keyword k))
+                    v* (if (and v coerce-fn) (coerce-fn v) v)]
+                [k v*])))
+       (into {})))
+
 (defn flush!
   "Invoking this method makes all buffered records immediately available
   to send (even if linger.ms is greater than 0) and blocks on the
@@ -78,7 +104,10 @@
    key and value serializer can be one of keys defined in `felice.serializer` namespace
    with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf"
   ([conf]
-   (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
+   (KafkaProducer. (-> conf
+                       (dissoc :key.serializer :value.serializer)
+                       coerce-producer-config
+                       walk/stringify-keys)
                    (serializer (:key.serializer conf))
                    (serializer (:value.serializer conf))))
   ([conf key-serializer value-serializer]
