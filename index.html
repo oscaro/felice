@@ -2865,183 +2865,8 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>com.oscaro/felice -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name"><a href="https://gitlab.oscaroad.com/it-dev/felice">com.oscaro/felice</a></h1><h2 class="project-version">3.2.0-1.5</h2><br /><p>Felice is client library for Apache Kafka in Clojure</p>
-</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.10.1</td></tr><tr><td class="dep-name">org.apache.kafka/kafka-clients</td><td class="dotted"><hr /></td><td class="dep-version">3.2.0</td></tr><tr><td class="dep-name">com.cognitect/transit-clj</td><td class="dotted"><hr /></td><td class="dep-version">0.8.319</td></tr><tr><td class="dep-name">metosin/jsonista</td><td class="dotted"><hr /></td><td class="dep-version">0.2.5</td></tr><tr><td class="dep-name">com.taoensso/nippy</td><td class="dotted"><hr /></td><td class="dep-version">3.1.1</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#felice.async">felice.async</a></li><li><a href="#felice.producer">felice.producer</a></li><li><a href="#felice.consumer">felice.consumer</a></li><li><a href="#felice.serialization">felice.serialization</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.async" name="felice.async"><h1 class="project-name">felice.async</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(ns felice.async
-  (:require [felice.consumer :as consumer])
-  (:import org.apache.kafka.common.errors.WakeupException))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def async-enabled?
-  (try
-    (require '[clojure.core.async :as async])
-    true
-    (catch Throwable _ false)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn- consumer-control [consumer [type data]]
-  (try
-    (condp = type
-      :commit-message (consumer/commit-message-offset consumer data)
-      (str &quot;unknown control type&quot; type))
-    (catch WakeupException _)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn commit-message-offset [consumer message]
-  (println (async/&gt;!! (:control-chan consumer)
-                      [:commit-message message]))
-  (consumer/wakeup (:consumer consumer)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn poll-chan
-  [consumer poll-timeout records-chan control-chan]
-  (future
-    (try
-      (while (not (clojure.core.async.impl.protocols/closed? records-chan))
-        (async/onto-chan records-chan
-                         (consumer/poll-&gt;all-records
-                          (try (consumer/poll consumer poll-timeout)
-                               (catch WakeupException _)))
-                         false)
-        ;; process consumer controls
-        (loop []
-          (let [res (async/alt!!
-                      control-chan ([control]
-                                    (if control
-                                      (consumer-control consumer control)
-                                      :closed))
-                      (async/timeout 100) :timeout)]
-            (when-not (#{:timeout :closed} res)
-              (recur)))))
-      :ok
-      (catch Throwable t t)
-      (finally
-        (.close consumer)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn poll-chans
-  [consumer poll-timeout topic-&gt;chan control-chan]
-  (let [continue? (atom true)
-        completion
-        (future
-          (try
-            (while @continue?
-              (let [poll (try (consumer/poll consumer poll-timeout)
-                              (catch WakeupException _))
-                    records-by-topic (consumer/poll-&gt;records-by-topic poll)]
-                (doseq [[topic records] records-by-topic]
-                  (async/onto-chan (topic-&gt;chan topic) records false)))
-              ;; process consumer controls
-              (loop []
-                (let [res (async/alt!!
-                            control-chan ([control]
-                                          (if control
-                                            (consumer-control consumer control)
-                                            :closed))
-                            (async/timeout 100) :timeout)]
-                  (when-not (#{:timeout :closed} res)
-                    (recur)))))
-            :ok
-            (catch Throwable t t)
-            (finally
-              (.close consumer))))]
-    (fn close! []
-      (reset! continue? false)
-      (deref completion))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn consumer
-  ([conf key-deserializer value-deserializer topic-&gt;chan]
-   {:pre [async-enabled?]}
-   (let [consumer (consumer/consumer conf key-deserializer value-deserializer)
-         control-chan (async/chan 100)]
-     (apply consumer/subscribe consumer (keys topic-&gt;chan))
-     (let [close-polling! (poll-chans consumer 2000 topic-&gt;chan control-chan)]
-       {:consumer     consumer
-        :chans        topic-&gt;chan
-        :control-chan control-chan
-        :close! (fn []
-                  (close-polling!)
-                  (async/close! control-chan)
-                  (doseq [chan (vals topic-&gt;chan)]
-                    (async/close! chan)))})))
-  ([conf key-deserializer value-deserializer records-chan &amp; topics]
-   {:pre [async-enabled?]}
-   (let [consumer (consumer/consumer conf key-deserializer value-deserializer)
-         control-chan (async/chan 100)]
-     (apply consumer/subscribe consumer topics)
-     (let [polling (poll-chan consumer 2000 records-chan control-chan)]
-       {:consumer consumer
-        :records-chan records-chan
-        :control-chan control-chan
-        :close!  (fn []
-                   (async/close! records-chan)
-                   (async/close! control-chan)
-                   (deref polling))}))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn close! [{:keys [close!] :as consumer}] (close!))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.producer" name="felice.producer"><h1 class="project-name">felice.producer</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(ns felice.producer
-  (:require [clojure.walk :as walk]
-            [felice.serialization :refer [serializer]])
-  (:import java.util.concurrent.TimeUnit
-           [org.apache.kafka.clients.producer KafkaProducer ProducerRecord Callback]))</pre></td></tr><tr><td class="docs"><p>Invoking this method makes all buffered records immediately available
-  to send (even if linger.ms is greater than 0) and blocks on the
-  completion of the requests associated with these records.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn flush!
-  [^KafkaProducer producer]
-  (.flush producer))</pre></td></tr><tr><td class="docs"><p>Get the full set of internal metrics maintained by the producer.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn metrics
-  [^KafkaProducer producer]
-  (.metrics producer))</pre></td></tr><tr><td class="docs"><p>Get the partition metadata for the given topic.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn partitions-for
-  [^KafkaProducer producer topic]
-  (.partitionsFor producer topic))</pre></td></tr><tr><td class="docs"><p>Transforms a clojure map to a ProducerRecord object</p>
-</td><td class="codes"><pre class="brush: clojure">(defn ^:no-doc producer-record
-  [{:keys [topic key value partition timestamp headers]}]
-  (ProducerRecord. topic partition timestamp key value headers))</pre></td></tr><tr><td class="docs"><p>Sends a ProducerRecord with an optional callback when the
-   send has been acknowledged.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn ^:no-doc send-record!
-  ([^KafkaProducer producer ^ProducerRecord record]
-   (.send producer (producer-record record)))
-  ([^KafkaProducer producer ^ProducerRecord record callback]
-   (.send producer
-          (producer-record record)
-          (reify Callback
-            (onCompletion [this metadata exception]
-              (callback (or exception metadata)))))))</pre></td></tr><tr><td class="docs"><p>creates a record map given a topic, a value and an optional key</p>
-</td><td class="codes"><pre class="brush: clojure">(defn -&gt;record
-  ([topic value]     {:topic topic          :value value})
-  ([topic key value] {:topic topic :key key :value value}))</pre></td></tr><tr><td class="docs"><p>asynchronously send a record</p>
-</td><td class="codes"><pre class="brush: clojure">(defn send!
-  ([^KafkaProducer producer topic value]     (send-record! producer (-&gt;record topic value)))
-  ([^KafkaProducer producer topic key value] (send-record! producer (-&gt;record topic key value)))
-  ([^KafkaProducer producer record-map]      (send-record! producer record-map)))</pre></td></tr><tr><td class="docs"><p>Asynchronously send a record triggering the given callback when the send has
-  been acknowledged.
-  Note that callbacks will generally execute in the I/O thread of the producer
-  and so should be reasonably fast or they will delay the sending of messages
-  from other threads.</p>
-
-<p>  If you want to execute blocking or computationally expensive callbacks it
-  is recommended to use your own Executor in the callback body to parallelize
-  processing.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn send-with-callback!
-  ([^KafkaProducer producer topic value cb]     (send-record! producer (-&gt;record topic value) cb))
-  ([^KafkaProducer producer topic key value cb] (send-record! producer (-&gt;record topic key value) cb))
-  ([^KafkaProducer producer record-map cb]      (send-record! producer record-map cb)))</pre></td></tr><tr><td class="docs"><p>Synchronously send a record - wait until acknowledged</p>
-</td><td class="codes"><pre class="brush: clojure">(defn send!!
-  ([^KafkaProducer producer topic value]     (send!! producer (-&gt;record topic value)))
-  ([^KafkaProducer producer topic key value] (send!! producer (-&gt;record topic key value)))
-  ([^KafkaProducer producer record-map] (.get (send! producer record-map))))</pre></td></tr><tr><td class="docs"><p>Create a producer</p>
-
-<p>   <code>conf</code> is a map {:keyword value}
-   See https://kafka.apache.org/documentation/#producerconfigs for all possibilities</p>
-
-<p>   key and value serializer can be one of keys defined in <code>felice.serializer</code> namespace
-   with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf</p>
-</td><td class="codes"><pre class="brush: clojure">(defn producer
-  ([conf]
-   (KafkaProducer. (walk/stringify-keys (dissoc conf :key.serializer :value.serializer))
-                   (serializer (:key.serializer conf))
-                   (serializer (:value.serializer conf))))
-  ([conf key-serializer value-serializer]
-   (producer (assoc conf :key.serializer key-serializer
-                    :value.serializer value-serializer))))</pre></td></tr><tr><td class="docs"><p>This method waits up to timeout ms for the producer to complete the
-  sending of all incomplete requests.</p>
-
-<p>  If the producer is unable to complete all requests before the timeout
-  expires, this method will fail any unsent and unacknowledged records immediately.</p>
-
-<p>  Calling close with no timeout is equivalent to close(Long.MAX_VALUE, TimeUnit.MILLISECONDS)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn close!
-  ([^KafkaProducer producer]         (.close producer))
-  ([^KafkaProducer producer timeout] (.close producer timeout TimeUnit/MILLISECONDS)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.consumer" name="felice.consumer"><h1 class="project-name">felice.consumer</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><p>A thin layer on top of java <a href="https://kafka.apache.org/21/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer</a></p>
+</script><title>com.oscaro/felice -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name"><a href="https://gitlab.oscaroad.com/it-dev/felice">com.oscaro/felice</a></h1><h2 class="project-version">3.2.0-1.6</h2><br /><p>Felice is client library for Apache Kafka in Clojure</p>
+</div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.10.1</td></tr><tr><td class="dep-name">org.apache.kafka/kafka-clients</td><td class="dotted"><hr /></td><td class="dep-version">3.2.0</td></tr><tr><td class="dep-name">com.cognitect/transit-clj</td><td class="dotted"><hr /></td><td class="dep-version">0.8.319</td></tr><tr><td class="dep-name">metosin/jsonista</td><td class="dotted"><hr /></td><td class="dep-version">0.2.5</td></tr><tr><td class="dep-name">com.taoensso/nippy</td><td class="dotted"><hr /></td><td class="dep-version">3.1.3</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#felice.consumer">felice.consumer</a></li><li><a href="#felice.serialization">felice.serialization</a></li><li><a href="#felice.producer">felice.producer</a></li><li><a href="#felice.async">felice.async</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.consumer" name="felice.consumer"><h1 class="project-name">felice.consumer</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><p>A thin layer on top of java <a href="https://kafka.apache.org/21/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html">KafkaConsumer</a></p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns felice.consumer
   (:require [clojure.walk :as walk]
@@ -3461,7 +3286,209 @@ process-record-fn: function to call with each record polled
       (throw (ex-info &quot;failed to initialize kafka deserializer&quot;
                       {:cause   (str &quot;unknown deserializer alias &quot; d)
                        :allowed (keys deserializers)})))
-    d))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_felice.async">felice.async</li><li class="floating-toc-li" id="floating-toc_felice.producer">felice.producer</li><li class="floating-toc-li" id="floating-toc_felice.consumer">felice.consumer</li><li class="floating-toc-li" id="floating-toc_felice.serialization">felice.serialization</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+    d))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.producer" name="felice.producer"><h1 class="project-name">felice.producer</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(ns felice.producer
+  (:require [clojure.walk :as walk]
+            [felice.serialization :refer [serializer]])
+  (:import java.util.concurrent.TimeUnit
+           [org.apache.kafka.clients.producer KafkaProducer ProducerRecord Callback]))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def CONF-COERCERS {:retries                               int
+                    :batch.size                            int
+                    :connections.max.idle.ms               int
+                    :delivery.timeout.ms                   int
+                    :max.request.size                      int
+                    :receive.buffer.bytes                  int
+                    :request.timeout.ms                    int
+                    :send.buffer.bytes                     int
+                    :max.in.flight.requests.per.connection int
+                    :metrics.num.samples                   int
+                    :sasl.login.connect.timeout.ms         int
+                    :sasl.login.read.timeout.ms            int
+                    :sasl.login.refresh.buffer.seconds     short
+                    :sasl.login.refresh.min.period.seconds short
+                    :sasl.oauthbearer.clock.skew.seconds   int
+                    :transaction.timeout.ms                int})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- coerce-producer-config
+  [cfg]
+  (-&gt;&gt; cfg
+       (map (fn [[k v]]
+              (let [coerce-fn (get CONF-COERCERS (keyword k))
+                    v* (if (and v coerce-fn) (coerce-fn v) v)]
+                [k v*])))
+       (into {})))</pre></td></tr><tr><td class="docs"><p>Invoking this method makes all buffered records immediately available
+  to send (even if linger.ms is greater than 0) and blocks on the
+  completion of the requests associated with these records.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn flush!
+  [^KafkaProducer producer]
+  (.flush producer))</pre></td></tr><tr><td class="docs"><p>Get the full set of internal metrics maintained by the producer.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn metrics
+  [^KafkaProducer producer]
+  (.metrics producer))</pre></td></tr><tr><td class="docs"><p>Get the partition metadata for the given topic.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn partitions-for
+  [^KafkaProducer producer topic]
+  (.partitionsFor producer topic))</pre></td></tr><tr><td class="docs"><p>Transforms a clojure map to a ProducerRecord object</p>
+</td><td class="codes"><pre class="brush: clojure">(defn ^:no-doc producer-record
+  [{:keys [topic key value partition timestamp headers]}]
+  (ProducerRecord. topic partition timestamp key value headers))</pre></td></tr><tr><td class="docs"><p>Sends a ProducerRecord with an optional callback when the
+   send has been acknowledged.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn ^:no-doc send-record!
+  ([^KafkaProducer producer ^ProducerRecord record]
+   (.send producer (producer-record record)))
+  ([^KafkaProducer producer ^ProducerRecord record callback]
+   (.send producer
+          (producer-record record)
+          (reify Callback
+            (onCompletion [this metadata exception]
+              (callback (or exception metadata)))))))</pre></td></tr><tr><td class="docs"><p>creates a record map given a topic, a value and an optional key</p>
+</td><td class="codes"><pre class="brush: clojure">(defn -&gt;record
+  ([topic value]     {:topic topic          :value value})
+  ([topic key value] {:topic topic :key key :value value}))</pre></td></tr><tr><td class="docs"><p>asynchronously send a record</p>
+</td><td class="codes"><pre class="brush: clojure">(defn send!
+  ([^KafkaProducer producer topic value]     (send-record! producer (-&gt;record topic value)))
+  ([^KafkaProducer producer topic key value] (send-record! producer (-&gt;record topic key value)))
+  ([^KafkaProducer producer record-map]      (send-record! producer record-map)))</pre></td></tr><tr><td class="docs"><p>Asynchronously send a record triggering the given callback when the send has
+  been acknowledged.
+  Note that callbacks will generally execute in the I/O thread of the producer
+  and so should be reasonably fast or they will delay the sending of messages
+  from other threads.</p>
+
+<p>  If you want to execute blocking or computationally expensive callbacks it
+  is recommended to use your own Executor in the callback body to parallelize
+  processing.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn send-with-callback!
+  ([^KafkaProducer producer topic value cb]     (send-record! producer (-&gt;record topic value) cb))
+  ([^KafkaProducer producer topic key value cb] (send-record! producer (-&gt;record topic key value) cb))
+  ([^KafkaProducer producer record-map cb]      (send-record! producer record-map cb)))</pre></td></tr><tr><td class="docs"><p>Synchronously send a record - wait until acknowledged</p>
+</td><td class="codes"><pre class="brush: clojure">(defn send!!
+  ([^KafkaProducer producer topic value]     (send!! producer (-&gt;record topic value)))
+  ([^KafkaProducer producer topic key value] (send!! producer (-&gt;record topic key value)))
+  ([^KafkaProducer producer record-map] (.get (send! producer record-map))))</pre></td></tr><tr><td class="docs"><p>Create a producer</p>
+
+<p>   <code>conf</code> is a map {:keyword value}
+   See https://kafka.apache.org/documentation/#producerconfigs for all possibilities</p>
+
+<p>   key and value serializer can be one of keys defined in <code>felice.serializer</code> namespace
+   with the 1 argument arity, :key.serializer and :value.serializer must be provided in conf</p>
+</td><td class="codes"><pre class="brush: clojure">(defn producer
+  ([conf]
+   (KafkaProducer. (-&gt; conf
+                       (dissoc :key.serializer :value.serializer)
+                       coerce-producer-config
+                       walk/stringify-keys)
+                   (serializer (:key.serializer conf))
+                   (serializer (:value.serializer conf))))
+  ([conf key-serializer value-serializer]
+   (producer (assoc conf :key.serializer key-serializer
+                    :value.serializer value-serializer))))</pre></td></tr><tr><td class="docs"><p>This method waits up to timeout ms for the producer to complete the
+  sending of all incomplete requests.</p>
+
+<p>  If the producer is unable to complete all requests before the timeout
+  expires, this method will fail any unsent and unacknowledged records immediately.</p>
+
+<p>  Calling close with no timeout is equivalent to close(Long.MAX_VALUE, TimeUnit.MILLISECONDS)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn close!
+  ([^KafkaProducer producer]         (.close producer))
+  ([^KafkaProducer producer timeout] (.close producer timeout TimeUnit/MILLISECONDS)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#felice.async" name="felice.async"><h1 class="project-name">felice.async</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(ns felice.async
+  (:require [felice.consumer :as consumer])
+  (:import org.apache.kafka.common.errors.WakeupException))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def async-enabled?
+  (try
+    (require '[clojure.core.async :as async])
+    true
+    (catch Throwable _ false)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- consumer-control [consumer [type data]]
+  (try
+    (condp = type
+      :commit-message (consumer/commit-message-offset consumer data)
+      (str &quot;unknown control type&quot; type))
+    (catch WakeupException _)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn commit-message-offset [consumer message]
+  (println (async/&gt;!! (:control-chan consumer)
+                      [:commit-message message]))
+  (consumer/wakeup (:consumer consumer)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn poll-chan
+  [consumer poll-timeout records-chan control-chan]
+  (future
+    (try
+      (while (not (clojure.core.async.impl.protocols/closed? records-chan))
+        (async/onto-chan records-chan
+                         (consumer/poll-&gt;all-records
+                          (try (consumer/poll consumer poll-timeout)
+                               (catch WakeupException _)))
+                         false)
+        ;; process consumer controls
+        (loop []
+          (let [res (async/alt!!
+                      control-chan ([control]
+                                    (if control
+                                      (consumer-control consumer control)
+                                      :closed))
+                      (async/timeout 100) :timeout)]
+            (when-not (#{:timeout :closed} res)
+              (recur)))))
+      :ok
+      (catch Throwable t t)
+      (finally
+        (.close consumer)))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn poll-chans
+  [consumer poll-timeout topic-&gt;chan control-chan]
+  (let [continue? (atom true)
+        completion
+        (future
+          (try
+            (while @continue?
+              (let [poll (try (consumer/poll consumer poll-timeout)
+                              (catch WakeupException _))
+                    records-by-topic (consumer/poll-&gt;records-by-topic poll)]
+                (doseq [[topic records] records-by-topic]
+                  (async/onto-chan (topic-&gt;chan topic) records false)))
+              ;; process consumer controls
+              (loop []
+                (let [res (async/alt!!
+                            control-chan ([control]
+                                          (if control
+                                            (consumer-control consumer control)
+                                            :closed))
+                            (async/timeout 100) :timeout)]
+                  (when-not (#{:timeout :closed} res)
+                    (recur)))))
+            :ok
+            (catch Throwable t t)
+            (finally
+              (.close consumer))))]
+    (fn close! []
+      (reset! continue? false)
+      (deref completion))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn consumer
+  ([conf key-deserializer value-deserializer topic-&gt;chan]
+   {:pre [async-enabled?]}
+   (let [consumer (consumer/consumer conf key-deserializer value-deserializer)
+         control-chan (async/chan 100)]
+     (apply consumer/subscribe consumer (keys topic-&gt;chan))
+     (let [close-polling! (poll-chans consumer 2000 topic-&gt;chan control-chan)]
+       {:consumer     consumer
+        :chans        topic-&gt;chan
+        :control-chan control-chan
+        :close! (fn []
+                  (close-polling!)
+                  (async/close! control-chan)
+                  (doseq [chan (vals topic-&gt;chan)]
+                    (async/close! chan)))})))
+  ([conf key-deserializer value-deserializer records-chan &amp; topics]
+   {:pre [async-enabled?]}
+   (let [consumer (consumer/consumer conf key-deserializer value-deserializer)
+         control-chan (async/chan 100)]
+     (apply consumer/subscribe consumer topics)
+     (let [polling (poll-chan consumer 2000 records-chan control-chan)]
+       {:consumer consumer
+        :records-chan records-chan
+        :control-chan control-chan
+        :close!  (fn []
+                   (async/close! records-chan)
+                   (async/close! control-chan)
+                   (deref polling))}))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn close! [{:keys [close!] :as consumer}] (close!))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a><div id="floating-toc"><ul><li class="floating-toc-li" id="floating-toc_felice.consumer">felice.consumer</li><li class="floating-toc-li" id="floating-toc_felice.serialization">felice.serialization</li><li class="floating-toc-li" id="floating-toc_felice.producer">felice.producer</li><li class="floating-toc-li" id="floating-toc_felice.async">felice.async</li></ul></div></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack
