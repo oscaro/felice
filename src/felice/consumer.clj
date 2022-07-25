@@ -36,7 +36,6 @@
                 [k v*])))
        (into {})))
 
-
 ;;; Commit functions
 
 (defn commit-sync
@@ -82,6 +81,17 @@
   [^KafkaConsumer consumer]
   (set (map topic-partition->map (.assignment consumer))))
 
+(defn assignment-by-topic
+  "returns a map {topic [assigned-partitions]}"
+  [^KafkaConsumer consumer]
+  (loop [remaining-assignment (.assignment consumer)
+         by-topic {}]
+    (if remaining-assignment
+      (let [topic-partition (first remaining-assignment)]
+        (recur (next remaining-assignment)
+               (update by-topic (.topic topic-partition) (fnil conj []) (.partition topic-partition))))
+      by-topic)))
+
 (defn subscription
   "returns the set of currenctly subscribed topics"
   [^KafkaConsumer consumer]
@@ -90,7 +100,9 @@
 (defn subscribe
   "subscribe the consumer to one or more topics
   automaticly resubscribes previous subscriptions
-  returns the consumer"
+  returns the consumer
+
+  note: subscribe and assign are mutually exclusive"
   [^KafkaConsumer consumer & topics]
   (.subscribe consumer ^java.util.Collection (concat (subscription consumer) topics))
   consumer)
@@ -104,6 +116,76 @@
 
 (defn ^:no-doc position [^KafkaConsumer consumer topic partition]
   (.position consumer (TopicPartition. topic partition)))
+
+(defn ^:no-doc topics->assigned-topic-partitions [^KafkaConsumer consumer topics]
+  (let [assignments (assignment-by-topic consumer)]
+    (if topics
+      (select-keys assignments (if (vector? topics) topics [topics]))
+      assignments)))
+
+(defn ^:no-doc ->topic-partitions
+  ([topic->partitions]
+   (mapcat (fn [[topic partitions]] (map #(TopicPartition. topic %) partitions)) topic->partitions))
+  ([^KafkaConsumer consumer topics-or-partitions]
+   (->topic-partitions (if (map? topics-or-partitions)
+                         topics-or-partitions
+                         (topics->assigned-topic-partitions consumer topics-or-partitions)))))
+
+(defn assign
+  "Manually assign partitions to this consumer.
+  topic-partitions should be a map {topic [partitions]}
+  returns the consumer
+  
+  note: assign and subscribe are mutualy exclusive"
+  [^KafkaConsumer consumer topic-partitions]
+  (.assign consumer ^java.util.Collection (->topic-partitions topic-partitions))
+  consumer)
+
+(defn seek-to-beginning
+  "seek to the first offset of either all the assigned partitions
+  or the given topic|[topics]|{topic [partitions]}
+  returns the consumer"
+  ([^KafkaConsumer consumer] (seek-to-beginning consumer nil))
+  ([^KafkaConsumer consumer topics-or-partitions]
+   (.seekToBeginning consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
+   consumer))
+
+(defn seek-to-end
+  "seek to the last offset of either all the assigned partitions
+  or the given topic|[topics]|{topic [partitions]}
+  returns the consumer"
+  ([^KafkaConsumer consumer] (seek-to-end consumer nil))
+  ([^KafkaConsumer consumer topics-or-partitions]
+   (.seekToEnd consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
+   consumer))
+
+(defn seek
+  "Overrides the fetch offsets that the consumer will use on the next poll
+  returns the consumer"
+  [^KafkaConsumer consumer topic partition offset]
+  (.seek consumer (TopicPartition. topic partition) offset)
+  consumer)
+
+(defn pause
+  "suspend fetching from either all the assigned partitions
+  or the given topic|[topics]|{topic [partitions]}
+  returns the consumer"
+  ([^KafkaConsumer consumer] (pause consumer nil))
+  ([^KafkaConsumer consumer topics-or-partitions]
+   (.pause consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
+   consumer))
+
+(defn resume
+  "resume fetching from either all the assigned partitions
+  or the given topic|[topics]|{topic [partitions]}
+  returns the consumer"
+  ([^KafkaConsumer consumer] (resume consumer nil))
+  ([^KafkaConsumer consumer topics-or-partitions]
+   (.resume consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
+   consumer))
+
+(defn paused [^KafkaConsumer consumer]
+  (map topic-partition->map (.paused consumer)))
 
 (defn poll
   "Fetch data for the topics or partitions specified using
@@ -147,6 +229,12 @@
   [^ConsumerRecords records]
   (map consumer-record->map (iterator-seq (.iterator records))))
 
+(defn poll->record
+  "takes the return off a poll (see ConsumerRecords)
+  returns the first record as a clojure map"
+  [^ConsumerRecords records]
+  (first (poll->all-records records)))
+
 (defn poll->records-by-topic
   "takes the return of a poll (see ConsumerRecords)
   returns a map {topic records-seq}"
@@ -154,7 +242,7 @@
   (let [topics (map (comp :topic topic-partition->map) (.partitions records))]
     (->> topics
          (map (fn [topic] [topic (map consumer-record->map
-                                     (.records records ^String topic))]))
+                                      (.records records ^String topic))]))
          (into {}))))
 
 (defn ^:no-doc poll->records-by-partition
@@ -215,6 +303,24 @@
   leave the group before the timeout expires, the consumer is force closed."
   ([^KafkaConsumer consumer]         (.close consumer))
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
+
+(defn poll-record* [consumer topic partition offset]
+  (-> consumer
+      (assign {topic [partition]})
+      (seek topic partition offset)
+      (poll 100)
+      (poll->record)))
+
+(defn poll-record
+  "instanciate a consumer according to consumer-conf
+  then fetches the record on the givent topic partiton and offset"
+  [consumer-conf topic partition offset]
+  (let [consumer (consumer (assoc consumer-conf
+                                  :enable.auto.commit false
+                                  :max.poll.records   1))
+        record (poll-record* topic partition offset)]
+    (close! consumer)
+    record))
 
 (defn poll-loop*
   [consumer
