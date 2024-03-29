@@ -1,5 +1,6 @@
 (ns felice.admin
   (:require [clojure.walk :refer [stringify-keys]]
+            [clojure.spec.alpha :as s]
             [clojure.string :as str])
   (:import org.apache.kafka.clients.admin.AdminClient
            org.apache.kafka.clients.admin.NewTopic
@@ -100,18 +101,19 @@
    m))
 
 
-(defn create-topic
-  "Create a new topic"
-  {:added "3.2.0-1.7"}
-  ([^AdminClient ac ^String topic-name partition-count replication-factor]
-   (create-topic ac topic-name partition-count replication-factor {}))
-  ([^AdminClient ac ^String topic-name partition-count replication-factor ^java.util.Map props]
-   (let [topic* (NewTopic. topic-name (int partition-count) (short replication-factor))]
-     (when-not (empty? props)
-       (.configs topic*
-                 (static-field->props props TopicConfig)))
-     (some->>
-      (.createTopics ac [topic*])
+(defn- mk-topic-instance
+  ^NewTopic
+  [^String topic-name partition-count replication-factor props]
+  (let [topic* (NewTopic. topic-name (int partition-count) (short replication-factor))]
+    (when-not (empty? props)
+      (.configs topic*
+                (static-field->props props TopicConfig)))
+    topic*))
+
+(defn- submit-topic-creation-request
+  [^AdminClient ac topic-instances]
+  (some->>
+      (.createTopics ac topic-instances)
       (.values)
       (map (fn [[k f]]
              (try
@@ -121,9 +123,37 @@
                (catch java.util.concurrent.ExecutionException e
                  {:topic k
                   :message (.getMessage e)
-                  :status :kafka.topic/error}))))
-      first))))
+                  :status :kafka.topic/error}))))))
 
+(defn create-topic
+  "Create a new topic"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac ^String topic-name partition-count replication-factor]
+   (create-topic ac topic-name partition-count replication-factor {}))
+  ([^AdminClient ac ^String topic-name partition-count replication-factor ^java.util.Map props]
+   (let [topic* (mk-topic-instance topic-name partition-count replication-factor props)]
+     (first (submit-topic-creation-request ac [topic*])))))
+
+(s/def :kafka.topic/name string?)
+(s/def :kafka.topic/partition-count int?)
+(s/def :kafka.topic/replication-factor int?)
+(s/def :kafka.topic/props map?)
+(s/def ::kafka-topic (s/keys :req-un [:kafka.topic/name
+                                      :kafka.topic/partition-count
+                                      :kafka.topic/replication-factor
+                                      :kafka.topic/props]))
+(s/def ::kafka-topics (s/coll-of ::kafka-topic))
+
+(defn create-topics
+  "Create new topics from list of objects"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac topics]
+   (if (s/valid? ::kafka-topics topics)
+     (let [topics* (->> topics
+                        (mapv (fn [{:keys [name partition-count replication-factor props] :as t}]
+                                (mk-topic-instance name partition-count replication-factor props))))]
+       (submit-topic-creation-request ac topics*))
+     (throw (ex-info "Bad Topics spec" (s/explain-data ::kafka-topic topics))))))
 
 (defn delete-topics
   "Delete a topic set list"
@@ -147,9 +177,3 @@
   {:added "3.2.0-1.7"}
   ([^AdminClient ac topic-name]
    (first (delete-topics ac #{topic-name}))))
-
-
-(comment
-  (with-open [ca (admin-client {:bootstrap.servers "localhost:9092"})]
-    (delete-topic ca "topic5"))
-  )
