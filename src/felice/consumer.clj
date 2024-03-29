@@ -1,6 +1,6 @@
-;; A thin layer on top of java [KafkaConsumer](https://kafka.apache.org/21/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html)
-
 (ns felice.consumer
+  "A thin layer on top of java `KafkaConsumer`
+   See: https://kafka.apache.org/21/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html"
   (:require [clojure.walk :as walk]
             [felice.serialization :refer [deserializer]])
   (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecords ConsumerRecord]
@@ -43,6 +43,7 @@
   the subscribed list of topics and partitions.
 
   consumer must be a KafkaConsumer object"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (.commitSync consumer))
 
@@ -52,6 +53,7 @@
   consumer must be a KafkaConsumer object
 
   record must be a map with :partition :topic and :offset"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer {:keys [partition topic offset] :as record}]
   (let [commit-point (long (inc offset))]
     (.commitSync consumer ^java.util.Map {(TopicPartition. topic partition)
@@ -67,22 +69,26 @@
 
 (defn metrics
   "returns a list of mtrics mapkept by the consumer"
+    {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (map (fn [^java.util.Map$Entry m] (metric->map (.getValue m))) (.metrics consumer)))
 
 (defn topic-partition->map
   "converts a TopicPartition object to a clojure map containing :topic and :partition"
+  {:added "3.2.0-1.7"}
   [^TopicPartition topic-partition]
   {:partition (.partition topic-partition)
    :topic     (.topic topic-partition)})
 
 (defn assignment
   "returns a set of topic-partition map currently assigned to this consumer."
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (set (map topic-partition->map (.assignment consumer))))
 
 (defn assignment-by-topic
   "returns a map {topic [assigned-partitions]}"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (loop [remaining-assignment (.assignment consumer)
          by-topic {}]
@@ -94,6 +100,7 @@
 
 (defn subscription
   "returns the set of currenctly subscribed topics"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (.subscription consumer))
 
@@ -103,6 +110,7 @@
   returns the consumer
 
   note: subscribe and assign are mutually exclusive"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer & topics]
   (.subscribe consumer ^java.util.Collection (concat (subscription consumer) topics))
   consumer)
@@ -110,6 +118,7 @@
 (defn unsubscribe
   "Unsubscribe from all topics currently subscribed
   returns the consumer"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (.unsubscribe consumer)
   consumer)
@@ -135,8 +144,9 @@
   "Manually assign partitions to this consumer.
   topic-partitions should be a map {topic [partitions]}
   returns the consumer
-  
+
   note: assign and subscribe are mutualy exclusive"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer topic-partitions]
   (.assign consumer ^java.util.Collection (->topic-partitions topic-partitions))
   consumer)
@@ -145,6 +155,7 @@
   "seek to the first offset of either all the assigned partitions
   or the given topic|[topics]|{topic [partitions]}
   returns the consumer"
+  {:added "3.2.0-1.7"}
   ([^KafkaConsumer consumer] (seek-to-beginning consumer nil))
   ([^KafkaConsumer consumer topics-or-partitions]
    (.seekToBeginning consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
@@ -154,6 +165,7 @@
   "seek to the last offset of either all the assigned partitions
   or the given topic|[topics]|{topic [partitions]}
   returns the consumer"
+  {:added "3.2.0-1.7"}
   ([^KafkaConsumer consumer] (seek-to-end consumer nil))
   ([^KafkaConsumer consumer topics-or-partitions]
    (.seekToEnd consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
@@ -162,6 +174,7 @@
 (defn seek
   "Overrides the fetch offsets that the consumer will use on the next poll
   returns the consumer"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer topic partition offset]
   (.seek consumer (TopicPartition. topic partition) offset)
   consumer)
@@ -170,6 +183,7 @@
   "suspend fetching from either all the assigned partitions
   or the given topic|[topics]|{topic [partitions]}
   returns the consumer"
+  {:added "3.2.0-1.7"}
   ([^KafkaConsumer consumer] (pause consumer nil))
   ([^KafkaConsumer consumer topics-or-partitions]
    (.pause consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
@@ -179,6 +193,7 @@
   "resume fetching from either all the assigned partitions
   or the given topic|[topics]|{topic [partitions]}
   returns the consumer"
+  {:added "3.2.0-1.7"}
   ([^KafkaConsumer consumer] (resume consumer nil))
   ([^KafkaConsumer consumer topics-or-partitions]
    (.resume consumer ^java.util.Collection (->topic-partitions consumer topics-or-partitions))
@@ -195,6 +210,7 @@
   Otherwise, it will await the timeout ms.
 
   If the timeout expires, an empty record set will be returned."
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer timeout]
   (.poll consumer (Duration/ofMillis timeout)))
 
@@ -206,6 +222,7 @@
 
   If no thread is blocking in a method which can throw WakeupException,
   the next call to such a method will raise it instead."
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (.wakeup consumer))
 
@@ -213,6 +230,7 @@
   "transforms a ConsumerRecord to a clojure map containing:
   `:key``:value` `:offset` `:topic` `:partition` `:timestamp`
   `:timestamp-type` and `:header`"
+  {:added "3.2.0-1.7"}
   [^ConsumerRecord record]
   {:key            (.key record)
    :offset         (.offset record)
@@ -226,18 +244,21 @@
 (defn poll->all-records
   "takes the return off a poll (see ConsumerRecords)
   returns a lazy seq of records as clojure maps"
+  {:added "3.2.0-1.7"}
   [^ConsumerRecords records]
   (map consumer-record->map (iterator-seq (.iterator records))))
 
 (defn poll->record
   "takes the return off a poll (see ConsumerRecords)
   returns the first record as a clojure map"
+  {:added "3.2.0-1.7"}
   [^ConsumerRecords records]
   (first (poll->all-records records)))
 
 (defn poll->records-by-topic
   "takes the return of a poll (see ConsumerRecords)
   returns a map {topic records-seq}"
+  {:added "3.2.0-1.7"}
   [^ConsumerRecords records]
   (let [topics (map (comp :topic topic-partition->map) (.partitions records))]
     (->> topics
@@ -249,7 +270,9 @@
   [^ConsumerRecords records])
 
 (defn poll-and-process
-  "Poll records and run process-fn on each of them (presumably for side effects)"
+  "Poll records and run process-fn on each
+   of them (presumably for side effects)"
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer timeout process-fn commit-policy]
   (let [records (-> (poll consumer timeout)
                     (poll->all-records))]
@@ -270,6 +293,7 @@
   with the 1 argument arity, :key.deserializer and :value.deserializer must be provided in conf
 
   you can optionaly provide a list of topics to subscribe to"
+  {:added "3.2.0-1.7"}
   ([conf]
    (let [kd (deserializer (:key.deserializer conf))
          vd (deserializer (:value.deserializer conf))
@@ -301,6 +325,7 @@
 
   If the consumer is unable to complete offset commits and gracefully
   leave the group before the timeout expires, the consumer is force closed."
+  {:added "3.2.0-1.7"}
   ([^KafkaConsumer consumer]         (.close consumer))
   ([^KafkaConsumer consumer timeout] (.close consumer (Duration/ofMillis timeout))))
 
@@ -314,6 +339,7 @@
 (defn poll-record
   "instanciate a consumer according to consumer-conf
   then fetches the record on the givent topic partiton and offset"
+  {:added "3.2.0-1.7"}
   [consumer-conf topic partition offset]
   (let [consumer (consumer (assoc consumer-conf
                                   :enable.auto.commit false
@@ -327,6 +353,7 @@
    process-record-fn
    {:keys [poll-timeout on-error-fn commit-policy close-timeout-ms]
     :or {poll-timeout 2000 close-timeout-ms 5000}}]
+  {:added "3.2.0-1.7"}
   (let [continue?  (atom true)
         completion (future
                      (try
@@ -368,6 +395,7 @@
 
 ### Returns
               stop-fn: callback function to stop the loop"
+  {:added "3.2.0-1.7"}
   ([consumer-conf process-record-fn] (poll-loop consumer-conf process-record-fn {}))
   ([consumer-conf process-record-fn opts]
    (let [consumer (consumer consumer-conf)]
@@ -406,6 +434,7 @@
 
 ### Returns
               stop-fn: callback function to stop the loop"
+  {:added "3.2.0-1.7"}
   ([consumer-conf process-record-fn] (poll-loops consumer-conf process-record-fn {}))
   ([consumer-conf process-record-fn {:as opts}]
    (if-let [topics (:topics consumer-conf)]

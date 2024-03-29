@@ -105,4 +105,6 @@
                    (async/close! control-chan)
                    (deref polling))}))))
 
-(defn close! [{:keys [close!] :as consumer}] (close!))
+(defn close!
+  [{:keys [close!] :as _consumer}]
+  (close!))
