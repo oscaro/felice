@@ -1,6 +1,9 @@
 (ns felice.admin
-  (:require [clojure.walk :refer [stringify-keys]])
+  (:require [clojure.walk :refer [stringify-keys]]
+            [clojure.string :as str])
   (:import org.apache.kafka.clients.admin.AdminClient
+           org.apache.kafka.clients.admin.NewTopic
+           org.apache.kafka.common.config.TopicConfig
            org.apache.kafka.common.Node))
 
 
@@ -76,3 +79,77 @@
    (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
      (doall
       (keep (partial list-consumer-groups-offsets ac) all-group-ids*)))))
+
+
+(defn- safely-resolve-field [class f]
+  (try (.get (.getField class f) nil) (catch Exception _ nil)))
+(defn- static-field->props
+  "From a configuration map, try to resolve static class
+   field and populate a"
+  [m class]
+  (reduce
+   (fn [acc p]
+     (let [[k v]
+           (map (fn [e]
+                  (->> (str/replace (name e) "." "_")
+                       (str/upper-case))) p)
+           k? (safely-resolve-field class k)
+           v? (or (safely-resolve-field class v) v)]
+       (if k? (assoc acc k? v?) acc)))
+   (sorted-map)
+   m))
+
+
+(defn create-topic
+  "Create a new topic"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac ^String topic-name partition-count replication-factor]
+   (create-topic ac topic-name partition-count replication-factor {}))
+  ([^AdminClient ac ^String topic-name partition-count replication-factor ^java.util.Map props]
+   (let [topic* (NewTopic. topic-name (int partition-count) (short replication-factor))]
+     (when-not (empty? props)
+       (.configs topic*
+                 (static-field->props props TopicConfig)))
+     (some->>
+      (.createTopics ac [topic*])
+      (.values)
+      (map (fn [[k f]]
+             (try
+               (.get f)
+               {:topic k
+                :status :kafka.topic/created}
+               (catch java.util.concurrent.ExecutionException e
+                 {:topic k
+                  :message (.getMessage e)
+                  :status :kafka.topic/error}))))
+      first))))
+
+
+(defn delete-topics
+  "Delete a topic set list"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac topics]
+   (->> (.deleteTopics ac topics)
+        (.values)
+        (map (fn [[k f]]
+               (try
+                 (.get f)
+                 {:topic k
+                  :status :kafka.topic/deleted}
+                 (catch java.util.concurrent.ExecutionException e
+                   {:topic k
+                    :message (.getMessage e)
+                    :status :kafka.topic/error})))))))
+
+
+(defn delete-topic
+  "Delete a topic"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac topic-name]
+   (first (delete-topics ac #{topic-name}))))
+
+
+(comment
+  (with-open [ca (admin-client {:bootstrap.servers "localhost:9092"})]
+    (delete-topic ca "topic5"))
+  )
