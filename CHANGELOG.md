@@ -2,6 +2,11 @@
 
 ## [SNAPSHOT]
 
+## [3.2.0-1.6/7]
+- Administration function namespace
+- Test context simplification
+- Test migrations
+
 ## [3.2.0-1.5]
 
 - Kafka Client version bump
