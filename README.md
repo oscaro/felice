@@ -124,6 +124,22 @@ You can set either :threads-by-topic or :threads option (if both are set, :threa
 (fc/poll-loops consumer-cfg print-record {"topic1" 1 "topic2" 4} {:commit-policy :never})
 ```
 
+
+#### Administration
+
+The `felice.admin` provide interface to `AdminClient` kafka class, used to perfor administration
+tasks on your cluster:
+
+```clojure
+(require [felice.admin :as fa])
+
+(with-open [ac (fa/admin-client {:bootstrap.servers "localhost:9092"})]
+  (fa/list-topics ac) ;;=> #{"foo" "bar"}
+  )
+```
+See all the administration methods [on documentation page](https://oscaro.github.io/felice/#felice.admin).
+
+
 #### Partitionning
 
 The partitionner used by a producer can be set using this [configuration key](https://kafka.apache.org/documentation/#producerconfigs_partitioner.class).
@@ -143,7 +159,7 @@ There is a comment at the bottom of the felice.producer namespace mimiking the d
 
 ## License
 
-Copyright © 2018 - 2022 Oscaro
+Copyright © 2018 - 2024 Oscaro
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
