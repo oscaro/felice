@@ -37,4 +37,3 @@
 - basic `consumer` + `process loop`
 - async consumer
 - serialization helpers
-
