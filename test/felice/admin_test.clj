@@ -1,8 +1,10 @@
 (ns felice.admin-test
   (:require [felice.admin :as admin]
+            [felice.consumer :as consumer]
+            [felice.producer :as producer]
             [clojure.test :refer :all]))
 
-(deftest admin
+(deftest admin-test
   (testing "admin methods"
     (let [admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})
           topic "foobar-baz"
@@ -33,3 +35,56 @@
       ;; Describe Cluster
       (is (= #{:cluster-id :authorized-operation :controller-node :nodes} (set (keys (admin/describe-cluster admin-client)))))
       (admin/admin-close admin-client))))
+
+
+(deftest consumer-state-tests
+  (testing "consumer state tests"
+    (let [admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})
+          producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
+          consumer (consumer/consumer {:bootstrap.servers "localhost:9092"
+                                       :group.id "test-1"
+                                       :max.poll.records 100
+                                       :auto.offset.reset "earliest"} :string :string)
+          topic "quux-baz"]
+
+      ;; Assert for deletion on empty topic
+      (doall
+       (for [x (admin/list-topics admin-client)]
+         (is (= {:topic x :status :kafka.topic/deleted}
+                (admin/delete-topic admin-client x)))))
+
+      (is (= #{} (admin/list-topics admin-client)))
+
+      (is (= {:topic topic :status :kafka.topic/created} (admin/create-topic admin-client topic 1 1)))
+      ;; => 3msg sent
+      (consumer/subscribe consumer topic)
+
+      (producer/send! producer topic "value")
+      (producer/send! producer topic "key" "value")
+      (producer/send! producer {:topic topic :key "key" :value "value"})
+      (producer/flush! producer)
+
+      (let [consumer-records (consumer/poll consumer 100000)
+            records (consumer/poll->all-records consumer-records)]
+        (is (not (.isEmpty consumer-records)) "we have polled something")
+        (is (= 3 (count records)))
+        (is (= "value" (:value (first records)))))
+      ;;(consumer/commit-sync consumer)
+g
+      (producer/close! producer)
+
+      (is (= [{:group-id "test-1"
+	       :topics
+	       {:topic "quux-baz"
+	        :offsets
+	        [{:topic-name "quux-baz"
+	          :partition "quux-baz-0",
+	          :metadata {:metadata "" :offset 3}}]}}]
+             (admin/list-consumer-groups-offsets admin-client)))
+      (is (= {"test-1" [{:topic "quux-baz", :sum 3}]}
+             (admin/list-consumer-groups-offsets-sum admin-client)))
+
+      (admin/delete-topic admin-client topic)
+
+      (admin/admin-close admin-client)
+      (consumer/close! consumer))))

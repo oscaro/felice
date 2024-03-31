@@ -97,7 +97,7 @@
   ([^AdminClient ac]
    (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
      (doall
-      (keep (partial list-consumer-groups-offsets ac) all-group-ids*))))
+      (mapcat (partial list-consumer-groups-offsets ac) all-group-ids*))))
   ([^AdminClient ac group-id]
    (some->> (.listConsumerGroupOffsets ac group-id)
             (.partitionsToOffsetAndMetadata)
