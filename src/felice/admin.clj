@@ -6,6 +6,7 @@
            org.apache.kafka.clients.admin.NewTopic
            org.apache.kafka.common.config.TopicConfig
            org.apache.kafka.common.Node
+           org.apache.kafka.common.TopicPartition
            org.apache.kafka.common.TopicPartitionInfo
            org.apache.kafka.clients.consumer.OffsetAndMetadata))
 
@@ -26,6 +27,7 @@
   [^OffsetAndMetadata offset-metadata]
   {:metadata (.metadata offset-metadata)
    :offset (.offset offset-metadata)})
+
 
 (defn admin-client
   "Instanciate an `AdminClient` from properties"
@@ -52,6 +54,21 @@
    (.close ac)))
 
 
+(defn admin-metrics
+  "Get the metrics kept by the adminClient"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac]
+   (some->> (.metrics ac)
+            (map #(.getValue %))
+            (map (fn [o]
+                   (let [name (.metricName o)]
+                     {:name (.name name)
+                      :group (.group name)
+                      :description (.description name)
+                      :tags (.tags name)
+                      :value (.metricValue o)}))))))
+
+
 (defn describe-cluster
   "Get information about the nodes in the cluster,
    using the default options."
@@ -73,61 +90,6 @@
    (some->> (.listTopics ac)
             (.names)
             deref)))
-
-
-(defn list-consumer-groups
-  "List the consumer groups for the current `AdminClient`
-   connection"
-  {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
-   (some->> (.listConsumerGroups ac)
-            (.all)
-            (.get)
-            (map (fn [o]
-                   {:group-id (.groupId o)
-                    :is-simple-consumer-group (.isSimpleConsumerGroup o)
-                    :state (keyword (.orElse (.state o) "unknown"))})))))
-
-
-(defn list-consumer-groups-offsets
-  "List consumer group offsets, if no group id specified,
-   compute for all the group-id well-known in the current
-   cluster connection."
-  {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
-   (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
-     (doall
-      (mapcat (partial list-consumer-groups-offsets ac) all-group-ids*))))
-  ([^AdminClient ac group-id]
-   (some->> (.listConsumerGroupOffsets ac group-id)
-            (.partitionsToOffsetAndMetadata)
-            (.get)
-            (map (fn [[t m]]
-                   {:topic-name (.topic t)
-                    :partition (str t)
-                    :metadata (->offset-metadata m)}))
-            (group-by :topic-name)
-            (map (fn [[t m]]
-                   {:topic t
-                    :offsets m}))
-            (map (fn [to]
-                   {:group-id group-id
-                    :topics to})))))
-
-
-(defn list-consumer-groups-offsets-sum
-  "Sum consumer group offset over all partitions"
-  ([^AdminClient ac]
-   (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
-     (into {} (keep (partial list-consumer-groups-offsets-sum ac) all-group-ids*))))
-  ([^AdminClient ac group-id]
-   (let [consumer-group* (list-consumer-groups-offsets ac group-id)]
-     (when-not (empty? consumer-group*)
-       {group-id (->> consumer-group*
-                  (map (fn [{:keys [topics]}]
-                         (let [{:keys [topic offsets]} topics]
-                           {:topic topic
-                            :sum (apply + (keep #(get-in % [:metadata :offset]) offsets))}))))}))))
 
 
 (defn- safely-resolve-field [class f]
@@ -213,17 +175,19 @@
   while fail for others. "
   {:added "3.2.0-1.7"}
   ([^AdminClient ac topics]
-   (->> (.deleteTopics ac topics)
-        (.values)
-        (map (fn [[k f]]
-               (try
-                 (.get f)
-                 {:topic k
-                  :status :kafka.topic/deleted}
-                 (catch java.util.concurrent.ExecutionException e
+   (if (s/valid? (s/coll-of :kafka.topic/name) topics)
+     (->> (.deleteTopics ac topics)
+          (.values)
+          (map (fn [[k f]]
+                 (try
+                   (.get f)
                    {:topic k
-                    :message (.getMessage e)
-                    :status :kafka.topic/error})))))))
+                    :status :kafka.topic/deleted}
+                   (catch java.util.concurrent.ExecutionException e
+                     {:topic k
+                      :message (.getMessage e)
+                      :status :kafka.topic/error})))))
+     (throw (ex-info "Bad Topics spec" (s/explain-data (s/coll-of :kafka.topic/name) topics))))))
 
 
 (defn delete-topic
@@ -259,16 +223,94 @@
    (first (describe-topic ac #{topic}))))
 
 
-(defn admin-metrics
-  "Get the metrics kept by the adminClient"
+(defn list-consumer-groups
+  "List the consumer groups for the current `AdminClient`
+   connection"
   {:added "3.2.0-1.7"}
   ([^AdminClient ac]
-   (some->> (.metrics ac)
-            (map #(.getValue %))
+   (some->> (.listConsumerGroups ac)
+            (.all)
+            (.get)
             (map (fn [o]
-                   (let [name (.metricName o)]
-                     {:name (.name name)
-                      :group (.group name)
-                      :description (.description name)
-                      :tags (.tags name)
-                      :value (.metricValue o)}))))))
+                   {:group-id (.groupId o)
+                    :is-simple-consumer-group (.isSimpleConsumerGroup o)
+                    :state (keyword (.orElse (.state o) "unknown"))})))))
+
+
+(defn list-consumer-groups-offsets
+  "List consumer group offsets, if no group id specified,
+   compute for all the group-id well-known in the current
+   cluster connection."
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac]
+   (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
+     (doall
+      (keep (partial list-consumer-groups-offsets ac) all-group-ids*))))
+  ([^AdminClient ac group-id]
+   (let [per-topic-offsets
+         (some->> (.listConsumerGroupOffsets ac group-id)
+                  (.partitionsToOffsetAndMetadata)
+                  (.get)
+                  (map (fn [[t m]]
+                         {:topic-name (.topic t)
+                          :partition (str t)
+                          :metadata (->offset-metadata m)}))
+                  (group-by :topic-name))]
+     (when (some? per-topic-offsets)
+       {:group-id group-id
+        :topics (into {} (map (fn [[t v]]
+                                [t (map #(dissoc % :topic-name) v)])
+                              per-topic-offsets))}))))
+
+
+(defn sum-consumer-groups-offsets
+  "Sum consumer group offset over all partitions"
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac]
+   (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
+     (into {} (keep (partial sum-consumer-groups-offsets ac) all-group-ids*))))
+  ([^AdminClient ac group-id]
+   (let [consumer-group* (list-consumer-groups-offsets ac group-id)]
+     (when-not (empty? consumer-group*)
+       {group-id (->> consumer-group*
+                      :topics
+                      (map (fn [[topic offsets]]
+                             {:topic topic
+                              :sum (apply + (map #(get-in % [:metadata :offset])
+                                                 offsets))})))}))))
+
+
+(defn set-consumer-group-topic-offset
+  "Alters offsets for the specified group of a specific topic.
+
+   Once alter completed, list the current offset
+
+   Yield nil if no link found between consummers & topic
+  "
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac ^String group-id ^String topic offset]
+   (let [target-offset (OffsetAndMetadata. (long offset))
+         old-om (.get (.partitionsToOffsetAndMetadata
+                       (.listConsumerGroupOffsets ac group-id)))
+         updated-offsets (into {}
+                               (keep (fn [[t]]
+                                       (when (= topic (.topic t))
+                                         {t target-offset}))
+                                    old-om))]
+     (when-not (empty? updated-offsets)
+       (loop [op (.all (.alterConsumerGroupOffsets ac group-id updated-offsets))]
+         (if (.isDone op)
+           {:group-id group-id
+            :topic topic
+            :offsets (some->> (list-consumer-groups-offsets ac group-id)
+                              :topics
+                              (filter (fn [[t]] (= t topic)))
+                              first
+                              second)}
+           (recur op)))))))
+
+
+(defn delete-consumer-groups
+  ([^AdminClient ac groups]))
+(defn delete-consumer-group
+  ([^AdminClient ac group-id]))

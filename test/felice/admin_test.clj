@@ -39,10 +39,11 @@
 
 (deftest consumer-state-tests
   (testing "consumer state tests"
-    (let [admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})
+    (let [group-id "test-1"
+          admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})
           producer (producer/producer {:bootstrap.servers "localhost:9092"} :string :string)
           consumer (consumer/consumer {:bootstrap.servers "localhost:9092"
-                                       :group.id "test-1"
+                                       :group.id group-id
                                        :max.poll.records 100
                                        :auto.offset.reset "earliest"} :string :string)
           topic "quux-baz"]
@@ -69,22 +70,42 @@
         (is (not (.isEmpty consumer-records)) "we have polled something")
         (is (= 3 (count records)))
         (is (= "value" (:value (first records)))))
-      ;;(consumer/commit-sync consumer)
-g
-      (producer/close! producer)
+
+      (consumer/close! consumer)
+
+      ;;Reset all the offset to beginning
+      (is (= {:group-id "test-1"
+	      :topic "quux-baz"
+	      :offsets
+	      [{:partition "quux-baz-0" :metadata {:metadata "" :offset 0}}]}
+             (admin/set-consumer-group-topic-offset admin-client group-id topic 0)))
+
+      (def consumer-2 (consumer/consumer {:bootstrap.servers "localhost:9092"
+                                          :group.id group-id
+                                          :max.poll.records 100
+                                          :auto.offset.reset "earliest"} :string :string))
+
+      (consumer/subscribe consumer-2 topic)
+
+
+
+      ;; Let's replay test then
+      (let [consumer-records (consumer/poll consumer-2 100000)
+            records (consumer/poll->all-records consumer-records)]
+        (is (not (.isEmpty consumer-records)) "we have polled something")
+        (is (= 3 (count records)))
+        (is (= "value" (:value (first records)))))
+
+      (consumer/close! consumer-2)
 
       (is (= [{:group-id "test-1"
 	       :topics
-	       {:topic "quux-baz"
-	        :offsets
-	        [{:topic-name "quux-baz"
-	          :partition "quux-baz-0",
-	          :metadata {:metadata "" :offset 3}}]}}]
+	       {"quux-baz"
+	        [{:partition "quux-baz-0" :metadata {:metadata "" :offset 3}}]}}]
              (admin/list-consumer-groups-offsets admin-client)))
       (is (= {"test-1" [{:topic "quux-baz", :sum 3}]}
-             (admin/list-consumer-groups-offsets-sum admin-client)))
+             (admin/sum-consumer-groups-offsets admin-client)))
 
       (admin/delete-topic admin-client topic)
-
-      (admin/admin-close admin-client)
-      (consumer/close! consumer))))
+      (producer/close! producer)
+      (admin/admin-close admin-client))))
