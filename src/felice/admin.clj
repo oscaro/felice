@@ -123,17 +123,17 @@
 (defn- submit-topic-creation-request
   [^AdminClient ac topic-instances]
   (some->>
-      (.createTopics ac topic-instances)
-      (.values)
-      (map (fn [[k f]]
-             (try
-               (.get f)
-               {:topic k
-                :status :kafka.topic/created}
-               (catch java.util.concurrent.ExecutionException e
-                 {:topic k
-                  :message (.getMessage e)
-                  :status :kafka.topic/error}))))))
+   (.createTopics ac topic-instances)
+   (.values)
+   (map (fn [[k f]]
+          (try
+            (.get f)
+            {:topic k
+             :status :kafka.topic/created}
+            (catch java.util.concurrent.ExecutionException e
+              {:topic k
+               :message (.getMessage e)
+               :status :kafka.topic/error}))))))
 
 (defn create-topic
   "Create a new topic"
@@ -253,9 +253,11 @@
                   (.get)
                   (map (fn [[t m]]
                          {:topic-name (.topic t)
-                          :partition (str t)
+                          :partition-name (str t)
+                          :partition t
                           :metadata (->offset-metadata m)}))
-                  (group-by :topic-name))]
+                  (group-by :topic-name)
+                  (not-empty))]
      (when (some? per-topic-offsets)
        {:group-id group-id
         :topics (into {} (map (fn [[t v]]
@@ -296,7 +298,7 @@
                                (keep (fn [[t]]
                                        (when (= topic (.topic t))
                                          {t target-offset}))
-                                    old-om))]
+                                     old-om))]
      (when-not (empty? updated-offsets)
        (loop [op (.all (.alterConsumerGroupOffsets ac group-id updated-offsets))]
          (if (.isDone op)
@@ -311,6 +313,55 @@
 
 
 (defn delete-consumer-groups
-  ([^AdminClient ac groups]))
+  "Delete consumer groups from the cluster with the default options."
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac groups]
+   (->> (.deleteConsumerGroups ac groups)
+        .deletedGroups
+        (map (fn [[group status]]
+               (try
+                 (.get status)
+                 {:group-id group
+                  :status :kafka.consumer-group/deleted}
+                 (catch Exception e
+                   {:group-id group
+                    :status :kafka.consumer-group/error
+                    :message (.getMessage e)})))))))
+
+
 (defn delete-consumer-group
-  ([^AdminClient ac group-id]))
+  "Delete one consumer group from the cluster
+   with the default options."
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac group-id]
+   (first (delete-consumer-groups ac [group-id]))))
+
+(s/def ::kafka-partition #(instance? TopicPartition %))
+(s/def ::kafka-partitions (s/coll-of ::kafka-partition))
+
+(defn delete-consumer-group-offsets
+  "Delete committed offsets for a set of partitions in a consumer group.
+
+  NOTE: This will succeed at the partition level only if the group is not
+  actively subscribed to the corresponding topic."
+  {:added "3.2.0-1.7"}
+  ([^AdminClient ac ^String group-id]
+   (when-let [partitions* (some->> (list-consumer-groups-offsets ac group-id)
+                                   :topics
+                                   (mapcat second)
+                                   (keep :partition))]
+     (delete-consumer-group-offsets ac group-id partitions*)))
+  ([^AdminClient ac ^String group-id  partitions]
+   (if (s/valid? ::kafka-partitions partitions)
+     (let [op (->> (.deleteConsumerGroupOffsets ac group-id (set partitions)))]
+       (->> partitions
+            (map (fn [^TopicPartition o]
+                   (try
+                     (.get (.partitionResult op o))
+                     {:partition-offset (.toString o)
+                      :status :kafka.consumer-group-offset/deleted}
+                     (catch Exception e
+                       {:partition-offset (.toString o)
+                        :status :kafka.consumer-group-offset/error
+                        :message (.getMessage e)}))))))
+     (throw (ex-info "Bad Partition spec" (s/explain-data ::kafka-partitions partitions))))))

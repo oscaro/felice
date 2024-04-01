@@ -74,11 +74,8 @@
       (consumer/close! consumer)
 
       ;;Reset all the offset to beginning
-      (is (= {:group-id "test-1"
-	      :topic "quux-baz"
-	      :offsets
-	      [{:partition "quux-baz-0" :metadata {:metadata "" :offset 0}}]}
-             (admin/set-consumer-group-topic-offset admin-client group-id topic 0)))
+      (is (= [0]
+             (map #(get-in %[:metadata :offset]) (:offsets (admin/set-consumer-group-topic-offset admin-client group-id topic 0)))))
 
       (def consumer-2 (consumer/consumer {:bootstrap.servers "localhost:9092"
                                           :group.id group-id
@@ -98,13 +95,15 @@
 
       (consumer/close! consumer-2)
 
-      (is (= [{:group-id "test-1"
-	       :topics
-	       {"quux-baz"
-	        [{:partition "quux-baz-0" :metadata {:metadata "" :offset 3}}]}}]
-             (admin/list-consumer-groups-offsets admin-client)))
+      (is (= 3
+             (:offset (:metadata (first (get-in (admin/list-consumer-groups-offsets admin-client group-id)
+                                                [:topics topic]))))))
       (is (= {"test-1" [{:topic "quux-baz", :sum 3}]}
              (admin/sum-consumer-groups-offsets admin-client)))
+
+      ;; Edges
+
+      (is (nil? (admin/sum-consumer-groups-offsets admin-client "broken-group-id")))
 
       (admin/delete-topic admin-client topic)
       (producer/close! producer)
