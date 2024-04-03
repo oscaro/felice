@@ -1,4 +1,4 @@
-(defproject com.oscaro/felice "3.2.0-1.7-SNAPSHOT"
+(defproject com.oscaro/felice "3.2.0-1.8-SNAPSHOT"
   :description "Felice is client library for Apache Kafka in Clojure"
   :url "https://github.com/oscaro/felice"
   :license {:name "Eclipse Public License"
