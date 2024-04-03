@@ -2,7 +2,7 @@
   (:require [clojure.walk :refer [stringify-keys]]
             [clojure.spec.alpha :as s]
             [clojure.string :as str])
-  (:import org.apache.kafka.clients.admin.AdminClient
+  (:import org.apache.kafka.clients.admin.Admin
            org.apache.kafka.clients.admin.NewTopic
            org.apache.kafka.common.config.TopicConfig
            org.apache.kafka.common.Node
@@ -30,13 +30,13 @@
 
 
 (defn admin-client
-  "Instanciate an `AdminClient` from properties"
+  "Instanciate an `Admin` from properties"
   {:added "3.2.0-1.7"}
-  ^AdminClient
+  ^Admin
   ([props]
    (let [props* (-> (stringify-keys props)
                     (dissoc :key.deserializer :value.deserializer :topics))
-         kac (. AdminClient (create ^java.util.Map props*))]
+         kac (. Admin (create ^java.util.Map props*))]
      kac)))
 
 
@@ -50,14 +50,14 @@
    Once the grace period is over, all operations that have not yet been
    completed will be aborted with a TimeoutException."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (.close ac)))
 
 
 (defn admin-metrics
   "Get the metrics kept by the adminClient"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (some->> (.metrics ac)
             (map #(.getValue %))
             (map (fn [o]
@@ -73,7 +73,7 @@
   "Get information about the nodes in the cluster,
    using the default options."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (let [desc (.describeCluster ac)
          aop (.authorizedOperations desc)
          cluster-id (.clusterId desc)]
@@ -84,9 +84,9 @@
 
 
 (defn list-topics
-  "List topics for the current `AdminClient` connection"
+  "List topics for the current `Admin` connection"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (some->> (.listTopics ac)
             (.names)
             deref)))
@@ -96,7 +96,7 @@
   (try (.get (.getField class f) nil) (catch Exception _ nil)))
 (defn- static-field->props
   "From a configuration map, try to resolve static class
-   field and populate a"
+   field and populate a map configuration"
   [m class]
   (reduce
    (fn [acc p]
@@ -121,7 +121,7 @@
     topic*))
 
 (defn- submit-topic-creation-request
-  [^AdminClient ac topic-instances]
+  [^Admin ac topic-instances]
   (some->>
    (.createTopics ac topic-instances)
    (.values)
@@ -138,9 +138,9 @@
 (defn create-topic
   "Create a new topic"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac ^String topic-name partition-count replication-factor]
+  ([^Admin ac ^String topic-name partition-count replication-factor]
    (create-topic ac topic-name partition-count replication-factor {}))
-  ([^AdminClient ac ^String topic-name partition-count replication-factor ^java.util.Map props]
+  ([^Admin ac ^String topic-name partition-count replication-factor ^java.util.Map props]
    (let [topic* (mk-topic-instance topic-name partition-count replication-factor props)]
      (first (submit-topic-creation-request ac [topic*])))))
 
@@ -160,7 +160,7 @@
   This operation is not transactional so it may succeed for some
   topics while fail for others. "
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac topics]
+  ([^Admin ac topics]
    (if (s/valid? ::kafka-topics topics)
      (let [topics* (->> topics
                         (mapv (fn [{:keys [name partition-count replication-factor props] :as t}]
@@ -174,7 +174,7 @@
   This operation is not transactional so it may succeed for some topics
   while fail for others. "
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac topics]
+  ([^Admin ac topics]
    (if (s/valid? (s/coll-of :kafka.topic/name) topics)
      (->> (.deleteTopics ac topics)
           (.values)
@@ -193,7 +193,7 @@
 (defn delete-topic
   "Delete a topic"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac topic-name]
+  ([^Admin ac topic-name]
    (first (delete-topics ac #{topic-name}))))
 
 
@@ -203,10 +203,10 @@
    If not topic list provided, describe all the topics in
    the cluster."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (let [topics* (list-topics ac)]
      (describe-topics ac topics*)))
-  ([^AdminClient ac topic-list]
+  ([^Admin ac topic-list]
    (let [op (.allTopicNames (.describeTopics ac topic-list))]
      (->> (into {} (.get op))
           (reduce (fn [acc [name o]]
@@ -219,15 +219,15 @@
 (defn describe-topic
   "Describe a topic."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac topic]
+  ([^Admin ac topic]
    (first (describe-topic ac #{topic}))))
 
 
 (defn list-consumer-groups
-  "List the consumer groups for the current `AdminClient`
+  "List the consumer groups for the current `Admin`
    connection"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (some->> (.listConsumerGroups ac)
             (.all)
             (.get)
@@ -242,11 +242,11 @@
    compute for all the group-id well-known in the current
    cluster connection."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
      (doall
       (keep (partial list-consumer-groups-offsets ac) all-group-ids*))))
-  ([^AdminClient ac group-id]
+  ([^Admin ac group-id]
    (let [per-topic-offsets
          (some->> (.listConsumerGroupOffsets ac group-id)
                   (.partitionsToOffsetAndMetadata)
@@ -268,10 +268,10 @@
 (defn sum-consumer-groups-offsets
   "Sum consumer group offset over all partitions"
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac]
+  ([^Admin ac]
    (let [all-group-ids* (map :group-id (list-consumer-groups ac))]
      (into {} (keep (partial sum-consumer-groups-offsets ac) all-group-ids*))))
-  ([^AdminClient ac group-id]
+  ([^Admin ac group-id]
    (let [consumer-group* (list-consumer-groups-offsets ac group-id)]
      (when-not (empty? consumer-group*)
        {group-id (->> consumer-group*
@@ -290,7 +290,7 @@
    Yield nil if no link found between consummers & topic
   "
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac ^String group-id ^String topic offset]
+  ([^Admin ac ^String group-id ^String topic offset]
    (let [target-offset (OffsetAndMetadata. (long offset))
          old-om (.get (.partitionsToOffsetAndMetadata
                        (.listConsumerGroupOffsets ac group-id)))
@@ -315,7 +315,7 @@
 (defn delete-consumer-groups
   "Delete consumer groups from the cluster with the default options."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac groups]
+  ([^Admin ac groups]
    (->> (.deleteConsumerGroups ac groups)
         .deletedGroups
         (map (fn [[group status]]
@@ -333,7 +333,7 @@
   "Delete one consumer group from the cluster
    with the default options."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac group-id]
+  ([^Admin ac group-id]
    (first (delete-consumer-groups ac [group-id]))))
 
 (s/def ::kafka-partition #(instance? TopicPartition %))
@@ -345,13 +345,13 @@
   NOTE: This will succeed at the partition level only if the group is not
   actively subscribed to the corresponding topic."
   {:added "3.2.0-1.7"}
-  ([^AdminClient ac ^String group-id]
+  ([^Admin ac ^String group-id]
    (when-let [partitions* (some->> (list-consumer-groups-offsets ac group-id)
                                    :topics
                                    (mapcat second)
                                    (keep :partition))]
      (delete-consumer-group-offsets ac group-id partitions*)))
-  ([^AdminClient ac ^String group-id  partitions]
+  ([^Admin ac ^String group-id  partitions]
    (if (s/valid? ::kafka-partitions partitions)
      (let [op (->> (.deleteConsumerGroupOffsets ac group-id (set partitions)))]
        (->> partitions

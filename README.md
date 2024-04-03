@@ -127,7 +127,7 @@ You can set either :threads-by-topic or :threads option (if both are set, :threa
 
 #### Administration
 
-The `felice.admin` provide interface to `AdminClient` kafka class, used to perfor administration
+The `felice.admin` provide interface to `Admin` kafka class, used to perform administration
 tasks on your cluster:
 
 ```clojure
