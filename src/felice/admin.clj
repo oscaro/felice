@@ -35,9 +35,8 @@
   ^Admin
   ([props]
    (let [props* (-> (stringify-keys props)
-                    (dissoc :key.deserializer :value.deserializer :topics))
-         kac (. Admin (create ^java.util.Map props*))]
-     kac)))
+                    (dissoc :key.deserializer :value.deserializer :topics))]
+     (Admin/create ^java.util.Map props*))))
 
 
 (defn admin-close
@@ -353,7 +352,7 @@
      (delete-consumer-group-offsets ac group-id partitions*)))
   ([^Admin ac ^String group-id  partitions]
    (if (s/valid? ::kafka-partitions partitions)
-     (let [op (->> (.deleteConsumerGroupOffsets ac group-id (set partitions)))]
+     (let [op (.deleteConsumerGroupOffsets ac group-id (set partitions))]
        (->> partitions
             (map (fn [^TopicPartition o]
                    (try
