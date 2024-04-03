@@ -16,9 +16,8 @@
     (catch WakeupException _)))
 
 (defn commit-message-offset [consumer message]
-  (println (async/>!! (:control-chan consumer)
-                      [:commit-message message]))
-
+  (async/>!! (:control-chan consumer)
+             [:commit-message message])
   (consumer/wakeup (:consumer consumer)))
 
 (defn poll-chan
@@ -105,4 +104,6 @@
                    (async/close! control-chan)
                    (deref polling))}))))
 
-(defn close! [{:keys [close!] :as consumer}] (close!))
+(defn close!
+  [{:keys [close!] :as _consumer}]
+  (close!))
