@@ -21,4 +21,4 @@
                                   [org.clojure/core.async "0.5.527"]
                                   [spootnik/unilog        "0.7.30"]]
                    :source-paths ["dev"]}}
-   :repl-options {:init-ns user})
+  :repl-options {:init-ns user})

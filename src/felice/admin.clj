@@ -28,7 +28,6 @@
   {:metadata (.metadata offset-metadata)
    :offset (.offset offset-metadata)})
 
-
 (defn admin-client
   "Instanciate an `Admin` from properties"
   {:added "3.2.0-1.7"}
@@ -37,7 +36,6 @@
    (let [props* (-> (stringify-keys props)
                     (dissoc :key.deserializer :value.deserializer :topics))]
      (Admin/create ^java.util.Map props*))))
-
 
 (defn admin-close
   "Close the Admin client and release all associated resources.
@@ -51,7 +49,6 @@
   {:added "3.2.0-1.7"}
   ([^Admin ac]
    (.close ac)))
-
 
 (defn admin-metrics
   "Get the metrics kept by the adminClient"
@@ -67,7 +64,6 @@
                       :tags (.tags name)
                       :value (.metricValue o)}))))))
 
-
 (defn describe-cluster
   "Get information about the nodes in the cluster,
    using the default options."
@@ -81,7 +77,6 @@
       :controller-node (->node (deref (.controller desc)))
       :nodes (map ->node (deref (.nodes desc)))})))
 
-
 (defn list-topics
   "List topics for the current `Admin` connection"
   {:added "3.2.0-1.7"}
@@ -89,7 +84,6 @@
    (some->> (.listTopics ac)
             (.names)
             deref)))
-
 
 (defn- safely-resolve-field [class f]
   (try (.get (.getField class f) nil) (catch Exception _ nil)))
@@ -108,7 +102,6 @@
        (if k? (assoc acc k? v?) acc)))
    (sorted-map)
    m))
-
 
 (defn- mk-topic-instance
   ^NewTopic
@@ -188,13 +181,11 @@
                       :status :kafka.topic/error})))))
      (throw (ex-info "Bad Topics spec" (s/explain-data (s/coll-of :kafka.topic/name) topics))))))
 
-
 (defn delete-topic
   "Delete a topic"
   {:added "3.2.0-1.7"}
   ([^Admin ac topic-name]
    (first (delete-topics ac #{topic-name}))))
-
 
 (defn describe-topics
   "Describe some topics in the cluster.
@@ -214,13 +205,11 @@
                             :partitions (map ->topic-partition (.partitions o))}))
                   (sorted-map))))))
 
-
 (defn describe-topic
   "Describe a topic."
   {:added "3.2.0-1.7"}
   ([^Admin ac topic]
    (first (describe-topic ac #{topic}))))
-
 
 (defn list-consumer-groups
   "List the consumer groups for the current `Admin`
@@ -234,7 +223,6 @@
                    {:group-id (.groupId o)
                     :is-simple-consumer-group (.isSimpleConsumerGroup o)
                     :state (keyword (.orElse (.state o) "unknown"))})))))
-
 
 (defn list-consumer-groups-offsets
   "List consumer group offsets, if no group id specified,
@@ -263,7 +251,6 @@
                                 [t (map #(dissoc % :topic-name) v)])
                               per-topic-offsets))}))))
 
-
 (defn sum-consumer-groups-offsets
   "Sum consumer group offset over all partitions"
   {:added "3.2.0-1.7"}
@@ -279,7 +266,6 @@
                              {:topic topic
                               :sum (apply + (map #(get-in % [:metadata :offset])
                                                  offsets))})))}))))
-
 
 (defn set-consumer-group-topic-offset
   "Alters offsets for the specified group of a specific topic.
@@ -310,7 +296,6 @@
                               second)}
            (recur op)))))))
 
-
 (defn delete-consumer-groups
   "Delete consumer groups from the cluster with the default options."
   {:added "3.2.0-1.7"}
@@ -326,7 +311,6 @@
                    {:group-id group
                     :status :kafka.consumer-group/error
                     :message (.getMessage e)})))))))
-
 
 (defn delete-consumer-group
   "Delete one consumer group from the cluster

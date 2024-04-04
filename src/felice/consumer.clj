@@ -69,7 +69,7 @@
 
 (defn metrics
   "returns a list of mtrics mapkept by the consumer"
-    {:added "3.2.0-1.7"}
+  {:added "3.2.0-1.7"}
   [^KafkaConsumer consumer]
   (map (fn [^java.util.Map$Entry m] (metric->map (.getValue m))) (.metrics consumer)))
 

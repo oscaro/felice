@@ -13,7 +13,6 @@
 (ul/start-logging! (-> ul/default-configuration
                        (assoc :overrides {"org.apache" :warn})))
 
-
 (deftest client
   (testing "produce and consume strings"
     (let [admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})

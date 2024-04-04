@@ -36,7 +36,6 @@
       (is (= #{:cluster-id :authorized-operation :controller-node :nodes} (set (keys (admin/describe-cluster admin-client)))))
       (admin/admin-close admin-client))))
 
-
 (deftest consumer-state-tests
   (testing "consumer state tests"
     (let [group-id "test-1"
@@ -75,7 +74,7 @@
 
       ;;Reset all the offset to beginning
       (is (= [0]
-             (map #(get-in %[:metadata :offset]) (:offsets (admin/set-consumer-group-topic-offset admin-client group-id topic 0)))))
+             (map #(get-in % [:metadata :offset]) (:offsets (admin/set-consumer-group-topic-offset admin-client group-id topic 0)))))
 
       (def consumer-2 (consumer/consumer {:bootstrap.servers "localhost:9092"
                                           :group.id group-id
@@ -84,9 +83,7 @@
 
       (consumer/subscribe consumer-2 topic)
 
-
-
-      ;; Let's replay test then
+;; Let's replay test then
       (let [consumer-records (consumer/poll consumer-2 100000)
             records (consumer/poll->all-records consumer-records)]
         (is (not (.isEmpty consumer-records)) "we have polled something")
