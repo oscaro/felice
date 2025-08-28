@@ -42,7 +42,7 @@ jobs:
         run: lein -U deps
 
       - name: Setup Test environnement
-        run: docker-compose up -d
+        run: docker compose up -d
 
       - name: Run tests
         run: lein test
