@@ -3,6 +3,6 @@ version: '3.7'
 services:
   kafka:
     container_name: kafka
-    image: vectorized/redpanda:v23.3.10
+    image: redpandadata/redpanda:v24.3.16
     ports:
       - 9092:9092
