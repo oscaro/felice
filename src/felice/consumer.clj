@@ -54,7 +54,7 @@
 
   record must be a map with :partition :topic and :offset"
   {:added "3.2.0-1.7"}
-  [^KafkaConsumer consumer {:keys [partition topic offset] :as record}]
+  [^KafkaConsumer consumer {:keys [partition topic offset] :as _record}]
   (let [commit-point (long (inc offset))]
     (.commitSync consumer ^java.util.Map {(TopicPartition. topic partition)
                                           (OffsetAndMetadata. commit-point)})))
@@ -267,7 +267,8 @@
          (into {}))))
 
 (defn ^:no-doc poll->records-by-partition
-  [^ConsumerRecords records])
+  "TODO: to be implemented"
+  [^ConsumerRecords _records])
 
 (defn poll-and-process
   "Poll records and run process-fn on each
@@ -344,7 +345,7 @@
   (let [consumer (consumer (assoc consumer-conf
                                   :enable.auto.commit false
                                   :max.poll.records   1))
-        record (poll-record* topic partition offset)]
+        record (poll-record* consumer topic partition offset)]
     (close! consumer)
     record))
 
@@ -362,7 +363,7 @@
                            (poll-and-process consumer poll-timeout process-record-fn commit-policy)
                            (catch WakeupException _)
                            (catch Throwable t
-                             (if on-error-fn (on-error-fn t))
+                             (when on-error-fn (on-error-fn t))
                              (throw t))))
                        :stopped
                        (catch Throwable t t)
@@ -402,7 +403,7 @@
      (poll-loop* consumer process-record-fn opts))))
 
 (defn poll-loops* [consumer-conf process-record-fn topics opts threads]
-  (for [n (range threads)
+  (for [_n (range threads)
         :let [consumer (consumer consumer-conf topics)]]
     (poll-loop* consumer process-record-fn opts)))
 
