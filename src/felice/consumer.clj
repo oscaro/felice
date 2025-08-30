@@ -3,9 +3,13 @@
    See: https://kafka.apache.org/21/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html"
   (:require [clojure.walk :as walk]
             [felice.serialization :refer [deserializer]])
-  (:import [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecords ConsumerRecord]
-           [org.apache.kafka.clients.consumer OffsetAndMetadata]
-           [org.apache.kafka.common TopicPartition Metric]
+  (:import org.apache.kafka.clients.consumer.KafkaConsumer
+           org.apache.kafka.clients.consumer.ConsumerRecords
+           org.apache.kafka.clients.consumer.ConsumerRecord
+           org.apache.kafka.clients.consumer.CommitFailedException
+           org.apache.kafka.clients.consumer.OffsetAndMetadata
+           org.apache.kafka.common.TopicPartition
+           org.apache.kafka.common.Metric
            org.apache.kafka.common.errors.WakeupException
            java.time.Duration))
 
@@ -401,6 +405,97 @@
   ([consumer-conf process-record-fn opts]
    (let [consumer (consumer consumer-conf)]
      (poll-loop* consumer process-record-fn opts))))
+
+
+(defn- consumer-poll-fsm
+  {:added "3.2.0-1.8"}
+  ([consumer-builder process-record-fn opts state]
+   (swap! state assoc :consumer (consumer-builder))
+   (consumer-poll-fsm consumer-builder process-record-fn opts state :kafka/poll))
+  ([consumer-builder process-record-fn
+    {:keys [poll-timeout on-error-fn commit-policy close-timeout-ms] :as opts
+     :or {poll-timeout 2000 close-timeout-ms 5000}}
+    state event]
+   (let [{:keys [consumer continue?]} @state]
+     (condp = event
+       ;; =================================================
+       :kafka/poll
+       (if continue?
+         (try
+           (poll-and-process consumer poll-timeout process-record-fn commit-policy)
+           (consumer-poll-fsm consumer-builder process-record-fn opts state :kafka/poll)
+           (catch Throwable t
+             (condp = (type t)
+
+               ;; Exception used to indicate preemption of a blocking operation by an external thread.
+               ;; For example, KafkaConsumer.wakeup() can be used to break out of an active
+               ;; KafkaConsumer.poll(java.time.Duration), which would raise an instance of this exception.
+               WakeupException
+               (consumer-poll-fsm consumer-builder
+                                  process-record-fn opts state :kafka/poll)
+
+               ;; This exception is raised when an offset commit with KafkaConsumer.commitSync() fails with an unrecoverable error.
+               ;; This can happen when a group rebalance completes before the commit could be
+               ;; successfully applied.
+               ;; In this case, the commit cannot generally be retried because some of the partitions may have already
+               ;; been assigned to another member in the group.
+               CommitFailedException
+               (consumer-poll-fsm consumer-builder
+                                  process-record-fn opts state :kafka/recovery)
+
+               ;; Uncatched error result to a re-throw
+               (do
+                 (when on-error-fn (on-error-fn t))
+                 (throw t)))))
+
+         ;; Go a stopping signal from the other thread, notify consumer to stop polling
+         ;; and close
+         (consumer-poll-fsm consumer-builder process-record-fn opts state :kafka/stopped))
+
+       ;; =================================================
+       :kafka/recovery
+       (do
+         (close! consumer (or close-timeout-ms Long/MAX_VALUE))
+         (swap! state assoc :consumer (consumer-builder))
+         (consumer-poll-fsm consumer-builder
+                            process-record-fn opts state :kafka/poll))
+
+       ;; =================================================
+       :kafka/stopped
+       (do
+         (close! consumer (or close-timeout-ms Long/MAX_VALUE))
+         :stopped)
+
+       ;; =================================================
+       (throw (ex-info "Felice FSM - Unhandled transition state" {:state event}))))))
+
+(defn poll-loop-ng*
+  [consumer-builder process-record-fn opts]
+  {:added "3.2.0-1.8"}
+  (let [state (atom {:continue? true})
+        consumer-fsm (future (consumer-poll-fsm consumer-builder
+                                                process-record-fn opts state))]
+    {:stop-fn
+     (fn ([]
+         (try
+           (swap! state assoc :continue? false)
+           (deref consumer-fsm)
+           :stopped
+           (catch Exception e
+             (throw e)
+             :error))))
+     :metrics (fn []
+                (when-let [c (:consumer (deref state))]
+                  (metrics c)))
+     :state state}))
+
+(defn poll-loop-ng
+  "Next Generation poll-loop with "
+  ([consumer-conf process-record-fn]
+   (poll-loop consumer-conf process-record-fn {:auto-reconnect true}))
+  ([consumer-conf process-record-fn opts]
+   (let [consumer-builder (partial consumer consumer-conf)]
+     (poll-loop-ng* consumer-builder process-record-fn opts))))
 
 (defn poll-loops* [consumer-conf process-record-fn topics opts threads]
   (for [_n (range threads)

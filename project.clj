@@ -19,6 +19,7 @@
                  [com.taoensso/nippy             "3.1.3"]]
   :profiles {:dev {:dependencies [[org.slf4j/slf4j-jdk14  "1.7.29" :exclusions [org.slf4j/slf4j-api]]
                                   [org.clojure/core.async "0.5.527"]
-                                  [spootnik/unilog        "0.7.30"]]
+                                  [spootnik/unilog        "0.7.30"]
+                                  [org.clojure/tools.namespace "1.5.0"]]
                    :source-paths ["dev"]}}
   :repl-options {:init-ns user})
