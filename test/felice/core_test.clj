@@ -199,3 +199,30 @@
                @stats)))
       (admin/admin-close admin-client)
       (producer/close! producer))))
+
+(deftest client-ng
+  (testing "poll-loop-ng"
+    (let [topic "topic007"
+          key-fmt :string
+          val-fmt :json
+          admin-client (admin/admin-client {:bootstrap.servers "localhost:9092"})
+          producer (producer/producer {:bootstrap.servers "localhost:9092"} key-fmt val-fmt)
+          consumer-cfg {:bootstrap.servers "localhost:9092"
+                        :group.id "testoeu-oeuo"
+                        :auto.offset.reset "earliest"
+                        :enable.auto.commit false
+                        :key.deserializer key-fmt
+                        :value.deserializer val-fmt
+                        :topics #{topic}}]
+      (is (= {:topic "topic007", :status :kafka.topic/created} (admin/create-topic admin-client topic 1 1)))
+      (let [counter (atom 0)
+            process-fn (fn [{:keys [topic partition offset timestamp key value] :as x}]
+                         (swap! counter + (:zob value)))
+            {:keys [stop-fn] :as loop} (consumer/poll-loop-ng consumer-cfg process-fn {})]
+        (producer/send! producer topic {:zob 42})
+        (Thread/sleep 1000)
+        (is (= 42 @counter))
+        (producer/send! producer topic {:zob 66})
+        (Thread/sleep 1000)
+        (is (= (+ 42 66) @counter))
+        (stop-fn)))))
